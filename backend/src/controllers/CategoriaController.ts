@@ -5,7 +5,7 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 export class CategoriaController {
     static async criar(req: AuthRequest, res: Response): Promise<any> {
         try {
-            const { nome } = req.body;
+            const { nome, parent_id } = req.body;
             const usuarios_id = req.usuarioId;
 
             if (!nome) {
@@ -16,7 +16,7 @@ export class CategoriaController {
                 return res.status(401).json({ erro: "Usuário não autenticado." });
             }
 
-            const id = await CategoriaModel.criar(nome, usuarios_id);
+            const id = await CategoriaModel.criar(nome, usuarios_id, parent_id || null);
             return res.status(201).json({ mensagem: "Categoria criada com sucesso", id });
         } catch (erro) {
             console.error(erro);
@@ -62,7 +62,7 @@ export class CategoriaController {
     static async atualizar(req: AuthRequest, res: Response): Promise<any> {
         try {
             const { id } = req.params;
-            const { nome } = req.body;
+            const { nome, parent_id } = req.body;
             const usuarios_id = req.usuarioId;
 
             if (!id || !nome) {
@@ -70,7 +70,7 @@ export class CategoriaController {
             }
             if (!usuarios_id) return res.status(401).json({ erro: "Usuário não autenticado." });
 
-            const atualizado = await CategoriaModel.atualizar(Number(id), usuarios_id, nome);
+            const atualizado = await CategoriaModel.atualizar(Number(id), usuarios_id, nome, parent_id || null);
             if (!atualizado) {
                 return res.status(404).json({ erro: "Categoria não encontrada ou não pertence a este usuário." });
             }

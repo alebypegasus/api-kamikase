@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserCheck, Users, Package, ShoppingBag, LogOut, ArrowLeft } from 'lucide-react';
+import { UserCheck, Users, Package, ShoppingBag, LogOut, ArrowLeft, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +13,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData();
+    document.body.classList.add('dark-admin');
+    return () => document.body.classList.remove('dark-admin');
   }, []);
 
   const fetchAdminData = async () => {
@@ -37,137 +39,272 @@ export default function AdminDashboard() {
     navigate('/');
   };
 
-  const globalTotalUsers = dashboardData.usuarios.length;
+  const globalTotalUsers = dashboardData.usuarios?.length || 0;
   const globalTotalProdutos = dashboardData.global?.produtos?.total || 0;
   const globalValorVendido = dashboardData.global?.vendas?.valor || 0;
   const globalEstoqueValor = dashboardData.global?.produtos?.valor || 0;
   const globalCategorias = dashboardData.global?.categorias?.total || 0;
 
   return (
-    <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column' }}>
-      
-      {/* Top Navbar */}
-      <header style={{
-        background: 'var(--bg-card)',
-        padding: '16px 32px',
-        borderBottom: '1px solid var(--border-color)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="auth-logo" style={{ width: '40px', height: '40px', marginBottom: 0, background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
-            <UserCheck size={20} />
+    <div className="admin-container">
+      <style>{`
+        .dark-admin {
+          background: #0b0f19;
+          color: #e2e8f0;
+          font-family: 'Inter', system-ui, sans-serif;
+          margin: 0;
+          padding: 0;
+          min-height: 100vh;
+        }
+        .admin-container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.1), transparent 40%),
+                      radial-gradient(circle at 0% 100%, rgba(20, 184, 166, 0.05), transparent 40%);
+        }
+        .admin-header {
+          background: rgba(15, 23, 42, 0.7);
+          backdrop-filter: blur(12px);
+          padding: 16px 32px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: sticky;
+          top: 0;
+          z-index: 50;
+        }
+        .admin-logo-box {
+          width: 44px;
+          height: 44px;
+          background: linear-gradient(135deg, #f59e0b, #ef4444);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        .admin-title {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 800;
+          background: linear-gradient(to right, #fcd34d, #f87171);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        .btn-outline {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #e2e8f0;
+          border-radius: 8px;
+          padding: 8px 16px;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-outline:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .btn-icon-admin {
+          background: transparent;
+          border: 1px solid transparent;
+          color: #94a3b8;
+          padding: 8px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-icon-admin:hover {
+          background: rgba(239, 68, 68, 0.1);
+          color: #f87171;
+        }
+        .stat-grid-admin {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 24px;
+          margin-bottom: 40px;
+        }
+        .stat-card-admin {
+          background: rgba(30, 41, 59, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          padding: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          position: relative;
+          overflow: hidden;
+        }
+        .stat-card-admin::after {
+          content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
+        }
+        .stat-card-admin.users::after { background: #3b82f6; }
+        .stat-card-admin.products::after { background: #8b5cf6; }
+        .stat-card-admin.categories::after { background: #ec4899; }
+        .stat-card-admin.stock::after { background: #14b8a6; }
+        .stat-card-admin.revenue::after { background: #f59e0b; }
+        
+        .stat-icon-admin {
+          width: 50px; height: 50px;
+          border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .content-panel-admin {
+          background: rgba(30, 41, 59, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 16px;
+          padding: 24px;
+        }
+        .table-admin {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 16px;
+        }
+        .table-admin th {
+          text-align: left;
+          padding: 16px;
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 500;
+          text-transform: uppercase;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .table-admin td {
+          padding: 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.02);
+          font-size: 14px;
+        }
+        .table-admin tr:hover td {
+          background: rgba(255,255,255,0.02);
+        }
+        .highlight-text {
+          color: #fcd34d;
+          font-weight: 600;
+        }
+        .highlight-text-green {
+          color: #2dd4bf;
+          font-weight: 600;
+        }
+      `}</style>
+
+      {/* Header */}
+      <header className="admin-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="admin-logo-box">
+            <ShieldAlert size={24} color="white" />
           </div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold' }}>Admin Center</h2>
+          <h1 className="admin-title">Kamikase ERP & PDV</h1>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '14px' }} onClick={() => navigate('/system')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <button className="btn-outline" onClick={() => navigate('/system')}>
             <ArrowLeft size={16} /> Voltar para o Sistema
           </button>
           
-          <div style={{ width: '1px', height: '24px', background: 'var(--border-color)' }}></div>
+          <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }}></div>
 
-          <div className="user-info" style={{ padding: 0 }}>
-            <div className="user-avatar" style={{ width: '32px', height: '32px', fontSize: '14px', background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
-              A
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{userName}</div>
+              <div style={{ fontSize: '12px', color: '#f87171' }}>Super Administrador</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 600, fontSize: '14px' }}>{userName}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Super Admin</span>
-            </div>
+            <button onClick={handleLogout} className="btn-icon-admin" title="Sair">
+              <LogOut size={20} />
+            </button>
           </div>
-          
-          <button onClick={handleLogout} className="btn-icon-only danger" title="Sair">
-            <LogOut size={16} />
-          </button>
         </div>
       </header>
 
       {/* Main Layout */}
       <div style={{ flexGrow: 1, padding: '40px', overflowY: 'auto' }}>
         
-        <h1 className="page-title" style={{ marginBottom: '32px' }}>Visão Global do Sistema</h1>
+        <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Visão Global da Plataforma</h2>
+        <p style={{ color: '#94a3b8', margin: '0 0 32px 0' }}>Métricas consolidadas de todos os lojistas ativos no sistema.</p>
 
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Usuários Cadastrados</span>
-              <span className="stat-value">{globalTotalUsers}</span>
+        <div className="stat-grid-admin">
+          <div className="stat-card-admin users">
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Lojistas Cadastrados</div>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalTotalUsers}</div>
             </div>
-            <div className="stat-icon-box" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-              <Users size={24} />
-            </div>
+            <div className="stat-icon-admin" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa' }}><Users size={24} /></div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Produtos Totais</span>
-              <span className="stat-value">{globalTotalProdutos}</span>
+          <div className="stat-card-admin products">
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Total de Produtos</div>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalTotalProdutos}</div>
             </div>
-            <div className="stat-icon-box purple"><Package size={24} /></div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Categorias Totais</span>
-              <span className="stat-value">{globalCategorias}</span>
-            </div>
-            <div className="stat-icon-box" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
-              <ShoppingBag size={24} />
-            </div>
+            <div className="stat-icon-admin" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa' }}><Package size={24} /></div>
           </div>
 
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Valor em Estoque</span>
-              <span className="stat-value">R$ {globalEstoqueValor.toFixed(2)}</span>
+          <div className="stat-card-admin categories">
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Total de Categorias</div>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalCategorias}</div>
             </div>
-            <div className="stat-icon-box cyan"><Package size={24} /></div>
+            <div className="stat-icon-admin" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6' }}><Package size={24} /></div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Total Faturado Global</span>
-              <span className="stat-value" style={{ color: 'var(--accent)' }}>R$ {globalValorVendido.toFixed(2)}</span>
+          <div className="stat-card-admin stock">
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Patrimônio em Estoque</div>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#2dd4bf' }}>R$ {globalEstoqueValor.toFixed(2)}</div>
             </div>
-            <div className="stat-icon-box" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-              <ShoppingBag size={24} />
+            <div className="stat-icon-admin" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#2dd4bf' }}><Package size={24} /></div>
+          </div>
+          
+          <div className="stat-card-admin revenue">
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Faturamento Global</div>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#fcd34d' }}>R$ {globalValorVendido.toFixed(2)}</div>
             </div>
+            <div className="stat-icon-admin" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24' }}><ShoppingBag size={24} /></div>
           </div>
         </div>
 
-        <div className="content-card">
-          <h2 className="card-title" style={{ marginBottom: '24px' }}>Desempenho por Usuário (Lojistas)</h2>
-          <div className="table-wrapper">
-            <table className="custom-table">
+        <div className="content-panel-admin">
+          <h3 style={{ fontSize: '18px', margin: '0 0 16px 0', fontWeight: 600 }}>Desempenho por Usuário (Lojistas)</h3>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table-admin">
               <thead>
                 <tr>
                   <th>ID</th>
                   <th>Lojista</th>
                   <th>E-mail</th>
-                  <th>Qtd. Produtos</th>
+                  <th>Produtos</th>
                   <th>Valor em Estoque</th>
-                  <th>Total de Vendas</th>
+                  <th>Qtd. Vendas</th>
                   <th>Faturamento Total</th>
                 </tr>
               </thead>
               <tbody>
-                {dashboardData.usuarios.length > 0 ? dashboardData.usuarios.map((d: any) => (
+                {dashboardData.usuarios?.length > 0 ? dashboardData.usuarios.map((d: any) => (
                   <tr key={d.usuario_id}>
-                    <td>#{d.usuario_id}</td>
-                    <td style={{ fontWeight: 600 }}>{d.nome}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{d.email}</td>
-                    <td>{d.total_produtos} produtos</td>
-                    <td className="price-text">R$ {Number(d.valor_total_estoque).toFixed(2)}</td>
-                    <td>{d.total_vendas} vendas</td>
-                    <td className="price-text" style={{ color: 'var(--accent)' }}>R$ {Number(d.valor_total_vendido).toFixed(2)}</td>
+                    <td style={{ color: '#64748b' }}>#{d.usuario_id}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '28px', height: '28px', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+                          {d.nome.charAt(0)}
+                        </div>
+                        {d.nome}
+                      </div>
+                    </td>
+                    <td style={{ color: '#94a3b8' }}>{d.email}</td>
+                    <td>{d.total_produtos} unid.</td>
+                    <td className="highlight-text-green">R$ {Number(d.valor_total_estoque).toFixed(2)}</td>
+                    <td>{d.total_vendas} oper.</td>
+                    <td className="highlight-text">R$ {Number(d.valor_total_vendido).toFixed(2)}</td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px' }}>
-                      <p style={{ color: 'var(--text-muted)' }}>Nenhum dado encontrado ou nenhum lojista cadastrado.</p>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                      Nenhum dado de lojista processado.
                     </td>
                   </tr>
                 )}

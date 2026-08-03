@@ -2,10 +2,10 @@ import { db } from '../config/database';
 import { ICategoria } from '../types';
 
 export class CategoriaModel {
-    static async criar(nome: string, usuarios_id: number | null = null): Promise<number> {
+    static async criar(nome: string, usuarios_id: number | null = null, parent_id: number | null = null): Promise<number> {
         const [resultado]: any = await db.execute(
-            'INSERT INTO categorias (nome, usuarios_id) VALUES (?, ?)',
-            [nome, usuarios_id]
+            'INSERT INTO categorias (nome, usuarios_id, parent_id) VALUES (?, ?, ?)',
+            [nome, usuarios_id, parent_id]
         );
         return resultado.insertId;
     }
@@ -26,10 +26,10 @@ export class CategoriaModel {
         return resultado.affectedRows > 0;
     }
 
-    static async atualizar(id: number, usuarios_id: number, nome: string): Promise<boolean> {
+    static async atualizar(id: number, usuarios_id: number, nome: string, parent_id: number | null = null): Promise<boolean> {
         const [resultado]: any = await db.execute(
-            'UPDATE categorias SET nome = ? WHERE id = ? AND usuarios_id = ?',
-            [nome, id, usuarios_id]
+            'UPDATE categorias SET nome = ?, parent_id = ? WHERE id = ? AND usuarios_id = ?',
+            [nome, parent_id, id, usuarios_id]
         );
         return resultado.affectedRows > 0;
     }

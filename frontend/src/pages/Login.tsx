@@ -111,7 +111,7 @@ export default function Login() {
           <div className="auth-logo">
             <ShoppingBag size={32} />
           </div>
-          <h1 className="auth-title">Kamikase</h1>
+          <h1 className="auth-title">Kamikase ERP & PDV</h1>
           <p className="auth-subtitle">
             {authState === 'login' ? 'Entre na sua conta para acessar o sistema' : 'Crie sua conta para começar'}
           </p>

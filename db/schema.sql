@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS categorias (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     usuarios_id INT NOT NULL,
+    parent_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES categorias(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS produtos (

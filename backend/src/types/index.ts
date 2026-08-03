@@ -10,6 +10,7 @@
         id?: number;
         nome: string;
         usuarios_id?: number;
+        parent_id?: number;
     }
 
     export interface IProduto {
