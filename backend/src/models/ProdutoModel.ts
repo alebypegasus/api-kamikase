@@ -4,8 +4,8 @@ import { IProduto, ICategoria } from '../types';
 export class ProdutoModel {
     static async criar(produto: Omit<IProduto, 'id'>): Promise<number> {
         const [resultado]: any = await db.execute(
-            'INSERT INTO produtos (nome, preco, categorias_id, usuarios_id, estoque) VALUES (?, ?, ?, ?, ?)',
-            [produto.nome, produto.preco, produto.categorias_id, produto.usuarios_id, produto.estoque ?? 0]
+            'INSERT INTO produtos (nome, descricao, preco, categorias_id, usuarios_id, estoque) VALUES (?, ?, ?, ?, ?, ?)',
+            [produto.nome, produto.descricao || null, produto.preco, produto.categorias_id, produto.usuarios_id, produto.estoque ?? 0]
         );
         return resultado.insertId;
     }

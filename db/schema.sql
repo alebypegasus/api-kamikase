@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS produtos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     preco DECIMAL(10,2) NOT NULL,
+    descricao TEXT,
     estoque INT DEFAULT 0,
     categorias_id INT NOT NULL,
     usuarios_id INT NOT NULL,
@@ -34,6 +35,9 @@ CREATE TABLE IF NOT EXISTS vendas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuarios_id INT NOT NULL,
     valor_total DECIMAL(10,2) NOT NULL,
+    desconto DECIMAL(10,2) DEFAULT 0.00,
+    forma_pagamento VARCHAR(50),
+    parcelas INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );

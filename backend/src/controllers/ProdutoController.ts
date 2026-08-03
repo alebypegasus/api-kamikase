@@ -5,7 +5,7 @@ import { ProdutoModel } from '../models/ProdutoModel';
 export class ProdutoController {
     static async criar(req: AuthRequest, res: Response): Promise<any> {
         try {
-            const { nome, preco, categorias_id, estoque } = req.body;
+            const { nome, descricao, preco, categorias_id, estoque } = req.body;
             const usuarios_id = req.usuarioId;
 
             if (!nome || preco === undefined || !categorias_id || !usuarios_id) {
@@ -14,6 +14,7 @@ export class ProdutoController {
 
             const id = await ProdutoModel.criar({
                 nome,
+                descricao,
                 preco,
                 categorias_id: Number(categorias_id),
                 usuarios_id,
@@ -121,7 +122,7 @@ export class ProdutoController {
     static async atualizar(req: AuthRequest, res: Response): Promise<any> {
         try {
             const { id } = req.params;
-            const { nome, preco, categorias_id, estoque } = req.body;
+            const { nome, descricao, preco, categorias_id, estoque } = req.body;
             const usuarios_id = req.usuarioId;
 
             if (!id || !usuarios_id) {
@@ -130,6 +131,7 @@ export class ProdutoController {
 
             const dadosAtualizados: any = {};
             if (nome) dadosAtualizados.nome = nome;
+            if (descricao !== undefined) dadosAtualizados.descricao = descricao;
             if (preco !== undefined) dadosAtualizados.preco = preco;
             if (categorias_id !== undefined) dadosAtualizados.categorias_id = Number(categorias_id);
             if (estoque !== undefined) dadosAtualizados.estoque = Number(estoque);

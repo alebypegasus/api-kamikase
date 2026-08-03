@@ -6,7 +6,7 @@ import { IVenda } from '../types';
 export class VendaController {
     static async criar(req: AuthRequest, res: Response) {
         try {
-            const { valor_total, itens } = req.body;
+            const { valor_total, itens, desconto, forma_pagamento, parcelas } = req.body;
             const usuariosId = req.usuarioId;
 
             if (!usuariosId) {
@@ -20,6 +20,9 @@ export class VendaController {
             const venda: IVenda = {
                 usuarios_id: usuariosId,
                 valor_total,
+                desconto,
+                forma_pagamento,
+                parcelas,
                 itens
             };
 

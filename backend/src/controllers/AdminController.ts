@@ -10,7 +10,8 @@ export class AdminController {
             }
 
             const dadosUsuarios = await AdminModel.obterDadosUsuarios();
-            res.json(dadosUsuarios);
+            const relatorioGlobal = await AdminModel.obterRelatorioGlobal();
+            res.json({ usuarios: dadosUsuarios, global: relatorioGlobal });
         } catch (error) {
             console.error(error);
             res.status(500).json({ erro: 'Erro ao buscar dados do painel administrador.' });

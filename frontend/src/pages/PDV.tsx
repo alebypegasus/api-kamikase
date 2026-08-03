@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, LogOut, CheckCircle, Tag, Package, UserCheck, Layers } from 'lucide-react';
+import { ShoppingBag, LogOut, CheckCircle, Tag, Package, UserCheck, Layers, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,6 +32,12 @@ export default function PDV() {
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
+
+  // Checkout states
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [desconto, setDesconto] = useState<number>(0);
+  const [formaPagamento, setFormaPagamento] = useState<string>('Dinheiro');
+  const [parcelas, setParcelas] = useState<number>(1);
 
   const getHeaders = () => ({
     'Content-Type': 'application/json',
@@ -91,6 +97,7 @@ export default function PDV() {
   };
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+  const totalWithDiscount = Math.max(0, cartTotal - desconto);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -110,12 +117,22 @@ export default function PDV() {
       const res = await fetch(`${API_URL}/vendas`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ valor_total: cartTotal, itens })
+        body: JSON.stringify({ 
+          valor_total: totalWithDiscount, 
+          itens,
+          desconto,
+          forma_pagamento: formaPagamento,
+          parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1
+        })
       });
 
       if (res.ok) {
         showNotification('Venda realizada com sucesso!');
         setCart([]);
+        setIsCheckoutModalOpen(false);
+        setDesconto(0);
+        setFormaPagamento('Dinheiro');
+        setParcelas(1);
         fetchProdutos(); // refresh stock
       } else {
         showNotification('Erro ao processar venda.');
@@ -313,14 +330,83 @@ export default function PDV() {
               className="btn btn-primary" 
               style={{ width: '100%', padding: '16px', fontSize: '18px' }}
               disabled={cart.length === 0}
-              onClick={handleCheckout}
+              onClick={() => setIsCheckoutModalOpen(true)}
             >
               Finalizar Venda
             </button>
           </div>
         </div>
-
       </div>
+
+      {/* Checkout Modal */}
+      {isCheckoutModalOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="modal-content" style={{ background: 'var(--bg-card)', padding: '32px', borderRadius: '12px', width: '400px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px' }}>Finalizar Venda</h2>
+              <button onClick={() => setIsCheckoutModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-color)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label>Subtotal</label>
+                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>R$ {cartTotal.toFixed(2)}</div>
+              </div>
+
+              <div className="form-group">
+                <label>Desconto (R$)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  step="0.01"
+                  className="form-input" 
+                  value={desconto} 
+                  onChange={e => setDesconto(Number(e.target.value))}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Forma de Pagamento</label>
+                <select 
+                  className="form-input" 
+                  value={formaPagamento}
+                  onChange={e => setFormaPagamento(e.target.value)}
+                >
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="PIX">PIX</option>
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                </select>
+              </div>
+
+              {formaPagamento === 'Cartão de Crédito' && (
+                <div className="form-group">
+                  <label>Parcelas</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="12"
+                    className="form-input" 
+                    value={parcelas} 
+                    onChange={e => setParcelas(Number(e.target.value))}
+                  />
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+                <label>Total Final</label>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary)' }}>R$ {totalWithDiscount.toFixed(2)}</div>
+              </div>
+
+              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', marginTop: '16px' }} onClick={handleCheckout}>
+                Confirmar Pagamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

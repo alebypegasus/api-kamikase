@@ -9,6 +9,7 @@ interface Produto {
   id: number;
   nome: string;
   preco: number;
+  descricao?: string;
   categorias_id: number;
   estoque: number;
 }
@@ -41,6 +42,7 @@ export default function SystemDashboard() {
   const [produtoModalOpen, setProdutoModalOpen] = useState(false);
   const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [produtoNome, setProdutoNome] = useState('');
+  const [produtoDescricao, setProdutoDescricao] = useState('');
   const [produtoPreco, setProdutoPreco] = useState('');
   const [produtoEstoque, setProdutoEstoque] = useState('0');
   const [produtoCategoriaId, setProdutoCategoriaId] = useState('');
@@ -164,6 +166,7 @@ export default function SystemDashboard() {
   const openAddProduto = () => {
     setSelectedProduto(null);
     setProdutoNome('');
+    setProdutoDescricao('');
     setProdutoPreco('');
     setProdutoEstoque('0');
     setProdutoCategoriaId(categorias[0]?.id?.toString() || '');
@@ -173,6 +176,7 @@ export default function SystemDashboard() {
   const openEditProduto = (prod: Produto) => {
     setSelectedProduto(prod);
     setProdutoNome(prod.nome);
+    setProdutoDescricao(prod.descricao || '');
     setProdutoPreco(prod.preco.toString());
     setProdutoEstoque(prod.estoque.toString());
     setProdutoCategoriaId(prod.categorias_id.toString());
@@ -187,6 +191,7 @@ export default function SystemDashboard() {
 
     const payload = {
       nome: produtoNome,
+      descricao: produtoDescricao,
       preco: Number(produtoPreco),
       categorias_id: Number(produtoCategoriaId),
       estoque: Number(produtoEstoque || 0)
@@ -485,6 +490,19 @@ export default function SystemDashboard() {
                     value={produtoNome}
                     onChange={(e) => setProdutoNome(e.target.value)}
                     required
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Descrição</label>
+                <div className="input-wrapper">
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Descrição do produto"
+                    value={produtoDescricao}
+                    onChange={(e) => setProdutoDescricao(e.target.value)}
+                    style={{ paddingLeft: '16px' }}
                   />
                 </div>
               </div>

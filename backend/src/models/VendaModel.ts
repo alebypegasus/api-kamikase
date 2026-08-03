@@ -8,8 +8,8 @@ export class VendaModel {
 
         try {
             const [resultado]: any = await connection.execute(
-                'INSERT INTO vendas (usuarios_id, valor_total) VALUES (?, ?)',
-                [venda.usuarios_id, venda.valor_total]
+                'INSERT INTO vendas (usuarios_id, valor_total, desconto, forma_pagamento, parcelas) VALUES (?, ?, ?, ?, ?)',
+                [venda.usuarios_id, venda.valor_total, venda.desconto || 0, venda.forma_pagamento || 'Dinheiro', venda.parcelas || 1]
             );
             
             const vendaId = resultado.insertId;

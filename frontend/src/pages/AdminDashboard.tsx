@@ -9,7 +9,7 @@ export default function AdminDashboard() {
   const { token, userName, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [dashboardData, setDashboardData] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<any>({ usuarios: [], global: null });
 
   useEffect(() => {
     fetchAdminData();
@@ -37,10 +37,11 @@ export default function AdminDashboard() {
     navigate('/');
   };
 
-  const globalTotalUsers = dashboardData.length;
-  const globalTotalProdutos = dashboardData.reduce((acc, curr) => acc + Number(curr.total_produtos), 0);
-  const globalValorVendido = dashboardData.reduce((acc, curr) => acc + Number(curr.valor_total_vendido), 0);
-  const globalEstoqueValor = dashboardData.reduce((acc, curr) => acc + Number(curr.valor_total_estoque), 0);
+  const globalTotalUsers = dashboardData.usuarios.length;
+  const globalTotalProdutos = dashboardData.global?.produtos?.total || 0;
+  const globalValorVendido = dashboardData.global?.vendas?.valor || 0;
+  const globalEstoqueValor = dashboardData.global?.produtos?.valor || 0;
+  const globalCategorias = dashboardData.global?.categorias?.total || 0;
 
   return (
     <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -102,12 +103,22 @@ export default function AdminDashboard() {
           
           <div className="stat-card">
             <div className="stat-info">
-              <span className="stat-label">Produtos na Plataforma</span>
+              <span className="stat-label">Produtos Totais</span>
               <span className="stat-value">{globalTotalProdutos}</span>
             </div>
             <div className="stat-icon-box purple"><Package size={24} /></div>
           </div>
           
+          <div className="stat-card">
+            <div className="stat-info">
+              <span className="stat-label">Categorias Totais</span>
+              <span className="stat-value">{globalCategorias}</span>
+            </div>
+            <div className="stat-icon-box" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
+              <ShoppingBag size={24} />
+            </div>
+          </div>
+
           <div className="stat-card">
             <div className="stat-info">
               <span className="stat-label">Valor em Estoque</span>
@@ -143,7 +154,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {dashboardData.length > 0 ? dashboardData.map(d => (
+                {dashboardData.usuarios.length > 0 ? dashboardData.usuarios.map((d: any) => (
                   <tr key={d.usuario_id}>
                     <td>#{d.usuario_id}</td>
                     <td style={{ fontWeight: 600 }}>{d.nome}</td>

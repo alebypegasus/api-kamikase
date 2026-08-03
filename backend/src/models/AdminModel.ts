@@ -19,4 +19,16 @@ export class AdminModel {
         const [linhas]: any = await db.execute(query);
         return linhas;
     }
+
+    static async obterRelatorioGlobal() {
+        const [totalVendas]: any = await db.execute('SELECT COUNT(*) as total, IFNULL(SUM(valor_total), 0) as valor FROM vendas');
+        const [totalProdutos]: any = await db.execute('SELECT COUNT(*) as total, IFNULL(SUM(preco * estoque), 0) as valor FROM produtos');
+        const [totalCategorias]: any = await db.execute('SELECT COUNT(*) as total FROM categorias');
+
+        return {
+            vendas: totalVendas[0],
+            produtos: totalProdutos[0],
+            categorias: totalCategorias[0]
+        };
+    }
 }
