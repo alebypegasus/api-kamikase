@@ -15,15 +15,15 @@ export class UsuarioModel {
 
     static async listarTodos(): Promise<IUsuario[]> {
         const [linhas]: any = await db.execute(
-            'SELECT id, nome, email FROM usuarios'
+            'SELECT id, nome, email, is_admin FROM usuarios'
         );
         return linhas as IUsuario[];
     }
 
     static async criar(usuario: IUsuario): Promise<number> {
         const [resultado]: any = await db.execute(
-            'INSERT INTO usuarios (nome, email, senha) VALUES (?, ?, ?)',
-            [usuario.nome, usuario.email, usuario.senha ?? null]
+            'INSERT INTO usuarios (nome, email, senha, is_admin) VALUES (?, ?, ?, ?)',
+            [usuario.nome, usuario.email, usuario.senha ?? null, usuario.is_admin ?? false]
         );
         return resultado.insertId;
     }

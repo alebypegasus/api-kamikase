@@ -10,25 +10,26 @@ export class CategoriaModel {
         return resultado.insertId;
     }
 
-    static async listarTodas(): Promise<ICategoria[]> {
+    static async listarPorUsuario(usuarios_id: number): Promise<ICategoria[]> {
         const [linhas]: any = await db.execute(
-            'SELECT * FROM categorias'
+            'SELECT * FROM categorias WHERE usuarios_id = ?',
+            [usuarios_id]
         );
         return linhas as ICategoria[];
     }
 
-    static async deletar(id: number): Promise<boolean> {
+    static async deletar(id: number, usuarios_id: number): Promise<boolean> {
         const [resultado]: any = await db.execute(
-            'DELETE FROM categorias WHERE id = ?',
-            [id]
+            'DELETE FROM categorias WHERE id = ? AND usuarios_id = ?',
+            [id, usuarios_id]
         );
         return resultado.affectedRows > 0;
     }
 
-    static async atualizar(id: number, nome: string): Promise<boolean> {
+    static async atualizar(id: number, usuarios_id: number, nome: string): Promise<boolean> {
         const [resultado]: any = await db.execute(
-            'UPDATE categorias SET nome = ? WHERE id = ?',
-            [nome, id]
+            'UPDATE categorias SET nome = ? WHERE id = ? AND usuarios_id = ?',
+            [nome, id, usuarios_id]
         );
         return resultado.affectedRows > 0;
     }

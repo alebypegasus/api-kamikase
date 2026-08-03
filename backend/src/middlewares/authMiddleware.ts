@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 
 export interface AuthRequest extends Request {
     usuarioId?: number;
+    isAdmin?: boolean;
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -15,8 +16,9 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     const [, token] = authHeader.split(' ');
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: number };
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: number, is_admin?: boolean };
         req.usuarioId = decoded.id;
+        req.isAdmin = decoded.is_admin || false;
         next();
     }
     catch (error) {

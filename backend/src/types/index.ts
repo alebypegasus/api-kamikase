@@ -3,6 +3,7 @@
         nome: string;
         email: string;
         senha?: string;
+        is_admin?: boolean;
     }
 
     export interface ICategoria {
@@ -19,3 +20,19 @@
         usuarios_id: number;
         estoque: number;
     }
+
+    export interface IVendaItem {
+        id?: number;
+        vendas_id?: number;
+        produtos_id: number;
+        quantidade: number;
+        preco_unitario: number;
+    }
+
+    export interface IVenda {
+        id?: number;
+        usuarios_id: number;
+        valor_total: number;
+        itens?: IVendaItem[];
+        created_at?: Date;
+    }

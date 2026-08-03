@@ -3,6 +3,8 @@ import cors from 'cors';
 import usuarioRoutes from './routes/usuarioRoutes';
 import categoriaRoutes from './routes/categoriaRoutes';
 import produtoRoutes from './routes/produtoRoutes';
+import vendaRoutes from './routes/vendaRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 const app = express();
 
@@ -39,6 +41,8 @@ app.get('/api/erro-500', (req, res) => {
 });
 
 app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/vendas', vendaRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORTA = 3000;
 app.listen(PORTA, () => {

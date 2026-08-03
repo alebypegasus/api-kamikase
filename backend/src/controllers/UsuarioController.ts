@@ -22,7 +22,8 @@ export class UsuarioController {
             const novoId = await UsuarioModel.criar({
                 nome,
                 email,
-                senha: senhaCriptografada
+                senha: senhaCriptografada,
+                is_admin: req.body.is_admin || false
             });
 
             return res.status(201).json({mensagem: 'Usuario cadastrado com sucesso.', id: novoId});
@@ -48,7 +49,7 @@ export class UsuarioController {
            }
 
            const token = jwt.sign(
-            { id: usuario.id, nome: usuario.nome},
+            { id: usuario.id, nome: usuario.nome, is_admin: usuario.is_admin},
             process.env.JWT_SECRET as string,
             {expiresIn: '8h' }
             );
