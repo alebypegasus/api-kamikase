@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,8 +6,15 @@ import { useNavigate } from 'react-router-dom';
 const API_URL = `http://${window.location.hostname}:3000/api`;
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, token, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (token) {
+      if (isAdmin) navigate('/adm');
+      else navigate('/pdv');
+    }
+  }, [token, isAdmin, navigate]);
 
   const [authState, setAuthState] = useState<'login' | 'register'>('login');
   const [authNome, setAuthNome] = useState('');

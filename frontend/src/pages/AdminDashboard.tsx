@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserCheck, Users, Package, ShoppingBag, LogOut, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { Users, Package, ShoppingBag, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,10 +40,10 @@ export default function AdminDashboard() {
   };
 
   const globalTotalUsers = dashboardData.usuarios?.length || 0;
-  const globalTotalProdutos = dashboardData.global?.produtos?.total || 0;
-  const globalValorVendido = dashboardData.global?.vendas?.valor || 0;
-  const globalEstoqueValor = dashboardData.global?.produtos?.valor || 0;
-  const globalCategorias = dashboardData.global?.categorias?.total || 0;
+  const globalTotalProdutos = Number(dashboardData.global?.produtos?.total || 0);
+  const globalValorVendido = Number(dashboardData.global?.vendas?.valor || 0);
+  const globalEstoqueValor = Number(dashboardData.global?.produtos?.valor || 0);
+  const globalCategorias = Number(dashboardData.global?.categorias?.total || 0);
 
   return (
     <div className="admin-container">
@@ -201,12 +201,6 @@ export default function AdminDashboard() {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <button className="btn-outline" onClick={() => navigate('/system')}>
-            <ArrowLeft size={16} /> Voltar para o Sistema
-          </button>
-          
-          <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }}></div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{userName}</div>

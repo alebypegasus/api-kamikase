@@ -489,12 +489,6 @@ export default function SystemDashboard() {
           <button className="btn-gradient" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/pdv')}>
             <ShoppingBag size={18} /> Ir para PDV
           </button>
-          
-          {isAdmin && (
-            <button className="btn-gradient" style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)' }} onClick={() => navigate('/adm')}>
-              <UserCheck size={18} /> Admin Center
-            </button>
-          )}
 
           <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
