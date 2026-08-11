@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = `http://${window.location.hostname}:3000/api`;
+import api from '../services/api';
 
 interface Produto {
   id: number;
@@ -25,7 +24,7 @@ interface CartItem extends Produto {
 }
 
 export default function PDV() {
-  const { token, userName, logout } = useAuth();
+  const { userName, logout } = useAuth();
   const navigate = useNavigate();
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -43,11 +42,6 @@ export default function PDV() {
   const [formaPagamento, setFormaPagamento] = useState<string>('Dinheiro');
   const [parcelas, setParcelas] = useState<number>(1);
 
-  const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  });
-
   useEffect(() => {
     fetchCategorias();
     fetchProdutos();
@@ -58,15 +52,15 @@ export default function PDV() {
 
   const fetchCategorias = async () => {
     try {
-      const res = await fetch(`${API_URL}/categorias`, { headers: getHeaders() });
-      if (res.ok) setCategorias(await res.json());
+      const res = await api.get('/categorias');
+      setCategorias(res.data);
     } catch (err) { console.error(err); }
   };
 
   const fetchProdutos = async () => {
     try {
-      const res = await fetch(`${API_URL}/produtos`, { headers: getHeaders() });
-      if (res.ok) setProdutos(await res.json());
+      const res = await api.get('/produtos');
+      setProdutos(res.data);
     } catch (err) { console.error(err); }
   };
 
@@ -125,32 +119,24 @@ export default function PDV() {
     }));
 
     try {
-      const res = await fetch(`${API_URL}/vendas`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ 
-          valor_total: finalTotal, 
-          itens,
-          desconto: descontoAmount,
-          forma_pagamento: formaPagamento,
-          parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1
-        })
+      await api.post('/vendas', { 
+        valor_total: finalTotal, 
+        itens,
+        desconto: descontoAmount,
+        forma_pagamento: formaPagamento,
+        parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1
       });
 
-      if (res.ok) {
-        showNotification('Venda realizada com sucesso!');
-        setCart([]);
-        setIsCheckoutModalOpen(false);
-        setDesconto(0);
-        setFormaPagamento('Dinheiro');
-        setParcelas(1);
-        fetchProdutos(); // refresh stock
-      } else {
-        showNotification('Erro ao processar venda.');
-      }
+      showNotification('Venda realizada com sucesso!');
+      setCart([]);
+      setIsCheckoutModalOpen(false);
+      setDesconto(0);
+      setFormaPagamento('Dinheiro');
+      setParcelas(1);
+      fetchProdutos(); // refresh stock
     } catch (err) {
       console.error(err);
-      showNotification('Erro de conexão.');
+      showNotification('Erro ao processar venda.');
     }
   };
 

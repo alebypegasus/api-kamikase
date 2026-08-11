@@ -1,119 +1,112 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { UsuarioModel } from '../models/UsuarioModel';
 
+const cadastrarSchema = z.object({
+    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
+    email: z.string().email("Formato de email inválido"),
+    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+    is_admin: z.boolean().optional()
+});
+
+const loginSchema = z.object({
+    email: z.string().email("Formato de email inválido"),
+    senha: z.string().min(1, "Senha é obrigatória")
+});
+
+const idSchema = z.object({
+    id: z.union([z.string(), z.number()]).transform(val => Number(val))
+});
+
+const atualizarSchema = z.object({
+    id: z.union([z.string(), z.number()]).transform(val => Number(val)),
+    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").optional(),
+    email: z.string().email("Formato de email inválido").optional(),
+    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional()
+});
+
 export class UsuarioController {
-    static async cadastrar(req: Request, res: Response): Promise<any> {
-        try {
-            const {nome, email, senha} = req.body;
+    static async cadastrar(req: Request, res: Response): Promise<void> {
+        const { nome, email, senha, is_admin } = cadastrarSchema.parse(req.body);
 
-            if (!nome ||!email ||!senha){
-                return res.status(400).json({mensagem: 'Todos os campos são obrigatorios.'});
-            }
-
-            const usuarioExistente = await UsuarioModel.buscarPorEmail(email);
-            if (usuarioExistente) {
-                return res.status(400).json({mensagem: 'Email já está em uso na base de dados.'});
-            }
-
-            const senhaCriptografada = await bcrypt.hash(senha, 10);
-
-            const novoId = await UsuarioModel.criar({
-                nome,
-                email,
-                senha: senhaCriptografada,
-                is_admin: req.body.is_admin || false
-            });
-
-            return res.status(201).json({mensagem: 'Usuario cadastrado com sucesso.', id: novoId});
-
-        } catch (error) {
-            console.error(error);
-            return res.status(500).json({ mensagem: 'Erro interno do servidor.'})
+        const usuarioExistente = await UsuarioModel.buscarPorEmail(email);
+        if (usuarioExistente) {
+            res.status(400).json({ mensagem: 'Email já está em uso na base de dados.' });
+            return;
         }
+
+        const senhaCriptografada = await bcrypt.hash(senha, 10);
+
+        const novoId = await UsuarioModel.criar({
+            nome,
+            email,
+            senha: senhaCriptografada,
+            is_admin: is_admin || false
+        });
+
+        res.status(201).json({ mensagem: 'Usuario cadastrado com sucesso.', id: novoId });
     }
 
-    static async login(req: Request, res: Response): Promise<any> {
-        try {
-            const { email, senha } = req.body;
+    static async login(req: Request, res: Response): Promise<void> {
+        const { email, senha } = loginSchema.parse(req.body);
 
-           const usuario = await UsuarioModel.buscarPorEmail(email);
-           if (!usuario) {
-                return res.status(401).json({mensagem: 'Credenciais invalidas'});
-           }
+        const usuario = await UsuarioModel.buscarPorEmail(email);
+        if (!usuario) {
+            res.status(401).json({ mensagem: 'Credenciais invalidas' });
+            return;
+        }
 
-           const senhaValida = await bcrypt.compare(senha, usuario.senha!);
-           if (!senhaValida) {
-            return res.status(401).json({mensagem: 'Credenciais invalidas'});
-           }
+        const senhaValida = await bcrypt.compare(senha, usuario.senha!);
+        if (!senhaValida) {
+            res.status(401).json({ mensagem: 'Credenciais invalidas' });
+            return;
+        }
 
-           const token = jwt.sign(
-            { id: usuario.id, nome: usuario.nome, is_admin: usuario.is_admin},
+        const token = jwt.sign(
+            { id: usuario.id, nome: usuario.nome, is_admin: usuario.is_admin },
             process.env.JWT_SECRET as string,
-            {expiresIn: '8h' }
-            );
+            { expiresIn: '8h' }
+        );
 
-            return res.status(200).json({ 
-                mensagem: 'Acesso autorizado!',
-                token: token,
-                nome: usuario.nome,
-                email: usuario.email
-            });
-
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ mensagem: 'Erro interno do servidor.'})
-        }    
+        res.status(200).json({
+            mensagem: 'Acesso autorizado!',
+            token: token,
+            nome: usuario.nome,
+            email: usuario.email,
+            is_admin: usuario.is_admin
+        });
     }
 
-    static async listarTodos(req: Request, res: Response): Promise<any> {
-        try {
-            const usuarios = await UsuarioModel.listarTodos();
-            return res.status(200).json(usuarios);
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ mensagem: 'Erro ao listar usuários.' });
-        }
+    static async listarTodos(req: Request, res: Response): Promise<void> {
+        const usuarios = await UsuarioModel.listarTodos();
+        res.status(200).json(usuarios);
     }
 
-    static async deletar(req: Request, res: Response): Promise<any> {
-    try {
-        // Agora pegamos o id de dentro do req.body
-        const { id } = req.body;
+    static async deletar(req: Request, res: Response): Promise<void> {
+        const { id } = idSchema.parse(req.body);
 
-        if (!id) {
-            return res.status(400).json({ mensagem: 'ID do usuário é obrigatório.' });
-        }
-
-        const deletado = await UsuarioModel.deletar(Number(id));
+        const deletado = await UsuarioModel.deletar(id);
         if (!deletado) {
-            return res.status(404).json({ mensagem: 'Usuário não encontrado.' });
+            res.status(404).json({ mensagem: 'Usuário não encontrado.' });
+            return;
         }
 
-        return res.status(200).json({ mensagem: 'Usuário deletado com sucesso.' });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ mensagem: 'Erro interno do servidor.' });
+        res.status(200).json({ mensagem: 'Usuário deletado com sucesso.' });
     }
-}
 
-static async atualizar(req: Request, res: Response): Promise<any> {
-    try {
-        // Agora pegamos o id de dentro do req.body junto com os outros dados
-        const { id, nome, email, senha } = req.body;
-
-        if (!id) {
-            return res.status(400).json({ mensagem: 'ID do usuário é obrigatório.' });
-        }
+    static async atualizar(req: Request, res: Response): Promise<void> {
+        const { id, nome, email, senha } = atualizarSchema.parse(req.body);
 
         const dadosAtualizacao: any = {};
         if (nome) dadosAtualizacao.nome = nome;
-        
+
         if (email) {
             const usuarioExistente = await UsuarioModel.buscarPorEmail(email);
-            if (usuarioExistente && usuarioExistente.id !== Number(id)) {
-                return res.status(400).json({ mensagem: 'Email já está em uso na base de dados.' });
+            if (usuarioExistente && usuarioExistente.id !== id) {
+                res.status(400).json({ mensagem: 'Email já está em uso na base de dados.' });
+                return;
             }
             dadosAtualizacao.email = email;
         }
@@ -123,20 +116,16 @@ static async atualizar(req: Request, res: Response): Promise<any> {
         }
 
         if (Object.keys(dadosAtualizacao).length === 0) {
-            return res.status(400).json({ mensagem: 'Nenhum campo enviado para alteração.' });
+            res.status(400).json({ mensagem: 'Nenhum campo enviado para alteração.' });
+            return;
         }
 
-        const atualizado = await UsuarioModel.atualizar(Number(id), dadosAtualizacao);
+        const atualizado = await UsuarioModel.atualizar(id, dadosAtualizacao);
         if (!atualizado) {
-            return res.status(404).json({ mensagem: 'Usuário não encontrado.' });
+            res.status(404).json({ mensagem: 'Usuário não encontrado.' });
+            return;
         }
 
-        return res.status(200).json({ mensagem: 'Usuário atualizado com sucesso.' });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ mensagem: 'Erro interno do servidor.' });
+        res.status(200).json({ mensagem: 'Usuário atualizado com sucesso.' });
     }
-}
-
-
 }

@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { Users, Package, ShoppingBag, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = `http://${window.location.hostname}:3000/api`;
+import api from '../services/api';
 
 export default function AdminDashboard() {
-  const { token, userName, logout } = useAuth();
+  const { userName, logout } = useAuth();
   const navigate = useNavigate();
 
   const [dashboardData, setDashboardData] = useState<any>({ usuarios: [], global: null });
@@ -19,16 +18,8 @@ export default function AdminDashboard() {
 
   const fetchAdminData = async () => {
     try {
-      const res = await fetch(`${API_URL}/admin/dashboard`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDashboardData(data);
-      }
+      const res = await api.get('/admin/dashboard');
+      setDashboardData(res.data);
     } catch (err) {
       console.error(err);
     }

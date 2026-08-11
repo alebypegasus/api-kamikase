@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = `http://${window.location.hostname}:3000/api`;
+import api from '../services/api';
 
 export default function Login() {
   const { login, token, isAdmin } = useAuth();
@@ -39,34 +38,32 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/usuarios/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail, senha: authSenha })
+      const res = await api.post('/usuarios/login', {
+        email: authEmail,
+        senha: authSenha
       });
 
-      const data = await res.json();
+      const data = res.data;
+      const is_admin = data.is_admin || false;
 
-      if (res.ok) {
-        // Obter payload do JWT para pegar is_admin (simplificado: pegando da resposta se backend enviar, ou assumir admin)
-        // Como o backend manda token, vamos decodificar o token manual
-        const tokenParts = data.token.split('.');
-        const payload = JSON.parse(atob(tokenParts[1]));
-        const is_admin = payload.is_admin || false;
+      login(data.token, data.nome, data.email || authEmail, is_admin);
 
-        login(data.token, data.nome, data.email || authEmail, is_admin);
-
-        if (is_admin) {
-            navigate('/adm');
+      if (is_admin) {
+        navigate('/adm');
+      } else {
+        navigate('/pdv');
+      }
+    } catch (err: any) {
+      console.error(err);
+      if (err.response && err.response.data) {
+        if (err.response.data.erros) {
+          addAlert('danger', 'Erro de validação: Verifique o formato do email e a senha.');
         } else {
-            navigate('/pdv');
+          addAlert('danger', err.response.data.mensagem || 'Credenciais inválidas.');
         }
       } else {
-        addAlert('danger', data.mensagem || 'Credenciais inválidas.');
+        addAlert('danger', 'Erro de comunicação com a API backend.');
       }
-    } catch (err) {
-      console.error(err);
-      addAlert('danger', 'Erro de comunicação com a API backend.');
     }
   };
 
@@ -78,24 +75,28 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/usuarios/cadastrar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: authNome, email: authEmail, senha: authSenha })
+      await api.post('/usuarios/cadastrar', {
+        nome: authNome,
+        email: authEmail,
+        senha: authSenha
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        addAlert('success', 'Cadastro realizado com sucesso! Faça login.');
-        setAuthState('login');
-        setAuthNome('');
-      } else {
-        addAlert('danger', data.mensagem || 'Erro ao realizar cadastro.');
-      }
-    } catch (err) {
+      addAlert('success', 'Cadastro realizado com sucesso! Faça login.');
+      setAuthState('login');
+      setAuthNome('');
+      
+    } catch (err: any) {
       console.error(err);
-      addAlert('danger', 'Erro de conexão com o servidor.');
+      if (err.response && err.response.data) {
+        if (err.response.data.erros) {
+            const mensagens = err.response.data.erros.map((e: any) => e.message).join(', ');
+            addAlert('danger', mensagens);
+        } else {
+            addAlert('danger', err.response.data.mensagem || 'Erro ao realizar cadastro.');
+        }
+      } else {
+        addAlert('danger', 'Erro de conexão com o servidor.');
+      }
     }
   };
 

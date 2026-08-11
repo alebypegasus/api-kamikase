@@ -44,6 +44,9 @@ app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/vendas', vendaRoutes);
 app.use('/api/admin', adminRoutes);
 
+import { errorHandler } from './middlewares/errorHandler';
+app.use(errorHandler);
+
 const PORTA = 3000;
 app.listen(PORTA, () => {
   console.log(`Servidor escutando na porta ${PORTA}...`);

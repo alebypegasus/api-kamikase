@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Tag, Package, UserCheck, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu } from 'lucide-react';
+import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = `http://${window.location.hostname}:3000/api`;
+import api from '../services/api';
 
 interface Produto {
   id: number;
@@ -21,7 +20,7 @@ interface Categoria {
 }
 
 export default function SystemDashboard() {
-  const { token, userName, logout, isAdmin } = useAuth();
+  const { userName, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const [view, setView] = useState<'dashboard' | 'produtos' | 'categorias'>('dashboard');
@@ -49,11 +48,6 @@ export default function SystemDashboard() {
   const [produtoEstoque, setProdutoEstoque] = useState('0');
   const [produtoCategoriaId, setProdutoCategoriaId] = useState('');
 
-  const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  });
-
   const showNotification = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
@@ -71,38 +65,32 @@ export default function SystemDashboard() {
 
   const fetchCategorias = async () => {
     try {
-      const res = await fetch(`${API_URL}/categorias`, { headers: getHeaders() });
-      if (res.ok) setCategorias(await res.json());
+      const res = await api.get('/categorias');
+      setCategorias(res.data);
     } catch (err) { console.error(err); }
   };
 
   const fetchProdutos = async () => {
     try {
-      const res = await fetch(`${API_URL}/produtos`, { headers: getHeaders() });
-      if (res.ok) setProdutos(await res.json());
+      const res = await api.get('/produtos');
+      setProdutos(res.data);
     } catch (err) { console.error(err); }
   };
 
   const fetchStats = async () => {
     try {
-      const resP = await fetch(`${API_URL}/produtos/total`, { headers: getHeaders() });
-      if (resP.ok) {
-        const dataP = await resP.json();
-        setTotalProdutos(dataP.total);
-      }
+      const resP = await api.get('/produtos/total');
+      setTotalProdutos(resP.data.total);
       
-      const resC = await fetch(`${API_URL}/produtos/categorias/total`, { headers: getHeaders() });
-      if (resC.ok) {
-        const dataC = await resC.json();
-        setTotalCategorias(dataC.total);
-      }
+      const resC = await api.get('/produtos/categorias/total');
+      setTotalCategorias(resC.data.total);
     } catch (err) { console.error(err); }
   };
 
   const fetchVendas = async () => {
     try {
-      const res = await fetch(`${API_URL}/vendas`, { headers: getHeaders() });
-      if (res.ok) setVendas(await res.json());
+      const res = await api.get('/vendas');
+      setVendas(res.data);
     } catch (err) { console.error(err); }
   };
 
@@ -131,44 +119,38 @@ export default function SystemDashboard() {
     if (!categoriaNome.trim()) return showNotification('Nome obrigatório');
 
     try {
-      const method = selectedCategoria ? 'PUT' : 'POST';
       const url = selectedCategoria 
-        ? `${API_URL}/categorias/${selectedCategoria.id}` 
-        : `${API_URL}/categorias`;
+        ? `/categorias/${selectedCategoria.id}` 
+        : `/categorias`;
 
-      const res = await fetch(url, {
-        method,
-        headers: getHeaders(),
-        body: JSON.stringify({ 
-          nome: categoriaNome,
-          parent_id: categoriaParentId ? Number(categoriaParentId) : null
-        })
-      });
+      const data = { 
+        nome: categoriaNome,
+        parent_id: categoriaParentId ? Number(categoriaParentId) : null
+      };
 
-      if (res.ok) {
-        showNotification(selectedCategoria ? 'Categoria atualizada' : 'Categoria criada');
-        fetchCategorias();
-        fetchStats();
-        setCategoriaModalOpen(false);
+      if (selectedCategoria) {
+          await api.put(url, data);
       } else {
-        const data = await res.json();
-        showNotification(data.erro || 'Erro ao salvar categoria');
+          await api.post(url, data);
       }
-    } catch (err) {
+
+      showNotification(selectedCategoria ? 'Categoria atualizada' : 'Categoria criada');
+      fetchCategorias();
+      fetchStats();
+      setCategoriaModalOpen(false);
+    } catch (err: any) {
       console.error(err);
-      showNotification('Erro de conexão');
+      showNotification(err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar categoria');
     }
   };
 
   const deleteCategoria = async (id: number) => {
     if (!confirm('Excluir categoria? Produtos podem ficar órfãos.')) return;
     try {
-      const res = await fetch(`${API_URL}/categorias/${id}`, { method: 'DELETE', headers: getHeaders() });
-      if (res.ok) {
-        showNotification('Categoria excluída.');
-        fetchCategorias();
-        fetchStats();
-      }
+      await api.delete(`/categorias/${id}`);
+      showNotification('Categoria excluída.');
+      fetchCategorias();
+      fetchStats();
     } catch (err) { console.error(err); }
   };
 
@@ -208,41 +190,33 @@ export default function SystemDashboard() {
     };
 
     try {
-      const method = selectedProduto ? 'PUT' : 'POST';
       const url = selectedProduto 
-        ? `${API_URL}/produtos/${selectedProduto.id}` 
-        : `${API_URL}/produtos`;
+        ? `/produtos/${selectedProduto.id}` 
+        : `/produtos`;
 
-      const res = await fetch(url, {
-        method,
-        headers: getHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        showNotification(selectedProduto ? 'Produto atualizado' : 'Produto criado');
-        fetchProdutos();
-        fetchStats();
-        setProdutoModalOpen(false);
+      if (selectedProduto) {
+          await api.put(url, payload);
       } else {
-        const data = await res.json();
-        showNotification(data.erro || 'Erro ao salvar produto');
+          await api.post(url, payload);
       }
-    } catch (err) {
+
+      showNotification(selectedProduto ? 'Produto atualizado' : 'Produto criado');
+      fetchProdutos();
+      fetchStats();
+      setProdutoModalOpen(false);
+    } catch (err: any) {
       console.error(err);
-      showNotification('Erro de conexão');
+      showNotification(err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar produto');
     }
   };
 
   const deleteProduto = async (id: number) => {
     if (!confirm('Excluir produto?')) return;
     try {
-      const res = await fetch(`${API_URL}/produtos/${id}`, { method: 'DELETE', headers: getHeaders() });
-      if (res.ok) {
-        showNotification('Produto excluído.');
-        fetchProdutos();
-        fetchStats();
-      }
+      await api.delete(`/produtos/${id}`);
+      showNotification('Produto excluído.');
+      fetchProdutos();
+      fetchStats();
     } catch (err) { console.error(err); }
   };
 
