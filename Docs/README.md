@@ -8,7 +8,7 @@ O projeto consiste em um ecossistema completo (Full-Stack) que engloba um Ponto 
 
 ## 1. Visão Geral da Arquitetura do Sistema e Topologia
 
-![Diagrama da Arquitetura](./Diagram.svg)
+![Diagrama da Arquitetura](./Diagram.png)
 
 O sistema foi desenhado utilizando o rígido padrão arquitetural **Cliente-Servidor**.
 Adotamos a estratégia de **Monorepo** (ambos os projetos, front e back, residem no mesmo repositório do Git), o que facilita a manutenção do código fonte, a instalação de dependências e a inicialização unificada, porém rodando em instâncias e portas completamente separadas durante as fases de desenvolvimento e produção.
@@ -222,3 +222,56 @@ Recentemente, a arquitetura deste projeto passou por uma forte refatoração par
 
 **O que mudou:** Exterminamos o uso do tipo `any` nos modelos de banco de dados (`UsuarioModel.ts`), substituindo-os pelas tipagens oficiais `RowDataPacket` e `ResultSetHeader` da lib `mysql2`.
 **Por que foi feito:** Utilizar `any` no TypeScript anula completamente o benefício da linguagem, enganando o compilador. Ao definir as tipagens exatas de Retorno do MySQL, garantimos autocompletar correto nas IDEs e impedimos bugs de tempo de execução onde o desenvolvedor tenta acessar uma propriedade que não existe em um array de banco de dados.
+
+### 7.6. Otimização de Layout Responsivo e Mobile-First
+
+**O que mudou:** Todo o frontend foi refatorado para suportar Media Queries CSS de forma nativa e eficiente. Interfaces como o PDV, Painel de Controle e Dashboards agora se adaptam a telas de celulares e tablets.
+**Por que foi feito:** O layout original (Baseado fortemente no estilo _Glassmorphism_) era dependente de hard-coding para larguras horizontais focadas em monitores Desktop (`display: flex` estrito sem quebra de linhas). Para garantir um uso universal (ex: um operador de caixa usando um tablet), toda a estrutura foi sobreposta com `@media (max-width: 1024px)` e `@media (max-width: 768px)`, garantindo fluxos em formato de coluna, tabelas roláveis horizontalmente (`overflow-x: auto`) e ocultação/rearranjo do layout do carrinho e menus laterais sem quebrar a estética premium da aplicação.
+
+---
+
+## 8. Ambiente de Testes e Base de Usuários (Seeding)
+
+Para facilitar a avaliação da plataforma e demonstrar a robustez e versatilidade do ecossistema frente a múltiplos nichos comerciais, o banco de dados foi populado com **11 usuários lojistas**.
+
+Todos os novos usuários abaixo foram previamente cadastrados com estruturas ricas de Categorias Hierárquicas (Categorias Parent e Subcategorias) e múltiplos Produtos associados aos seus respectivos nichos. 
+
+**Senha de acesso universal para todos:** `123`
+
+### 8.1. O Lojista Original
+- **Ale Ramos** (`ale.ramos.oliveira@hotmail.com`)
+  - **Nicho**: Informática (Venda de peças, computadores, etc).
+
+### 8.2. Os 10 Novos Lojistas de Nichos Variados
+1. **Carlos Oliveira** (`carlos@veiculos.com`)
+   - **Nicho**: Equipamentos Veiculares.
+   - **Exemplos**: Som Automotivo (Rádios, Alto-falantes) e Acessórios (Alarmes, Tapetes).
+2. **Maria Silva** (`maria@modafashion.com`)
+   - **Nicho**: Roupas e Vestuário.
+   - **Exemplos**: Moda Feminina (Vestidos, Blusas) e Moda Masculina (Camisas, Calças).
+3. **João Pedro** (`joao@calcados.com`)
+   - **Nicho**: Sapatos e Calçados.
+   - **Exemplos**: Calçados Esportivos, Sociais e Casuais (Tênis, Sapatos Oxford, Sandálias).
+4. **Ana Santos** (`ana@cosmeticos.com`)
+   - **Nicho**: Cosméticos e Perfumaria.
+   - **Exemplos**: Maquiagem, Fragrâncias (Perfumes 100ml) e Cuidados com a Pele.
+5. **Roberto Costa** (`roberto@eletronicos.com`)
+   - **Nicho**: Eletrônicos.
+   - **Exemplos**: Smartphones de Última Geração, Hardware de PC e Periféricos Gamers.
+6. **Fernanda Lima** (`fernanda@saudenatural.com`)
+   - **Nicho**: Produtos Naturais e Saúde.
+   - **Exemplos**: Suplementos (Whey Protein, Vitaminas) e Chás e Ervas Naturais.
+7. **Marcos Souza** (`marcos@construcao.com`)
+   - **Nicho**: Material de Construção.
+   - **Exemplos**: Ferramentas Elétricas, Manuais e Materiais Básicos (Hidráulica, Elétrica).
+8. **Patricia Alves** (`patricia@esportes.com`)
+   - **Nicho**: Artigos Esportivos.
+   - **Exemplos**: Esportes de Quadra (Futebol) e Itens de Fitness/Musculação.
+9. **Thiago Rocha** (`thiago@petshop.com`)
+   - **Nicho**: Pet Shop.
+   - **Exemplos**: Itens para Cães (Rações, Brinquedos) e Gatos (Sachês, Areia Sanitária).
+10. **Camila Gomes** (`camila@papelaria.com`)
+    - **Nicho**: Livraria e Papelaria.
+    - **Exemplos**: Livros Didáticos, Ficção e Material Escolar Geral.
+
+*Esses dados provam que o sistema foi construído perfeitamente isolado e parametrizado (Multi-tenant), permitindo que cada e-mail visualize e transacione única e exclusivamente seus próprios produtos e vendas no Ponto de Venda e no Dashboard, sem vazamento ou cruzamento de dados entre os lojistas.*

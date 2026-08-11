@@ -432,6 +432,63 @@ export default function SystemDashboard() {
           font-size: 12px;
           font-weight: 500;
         }
+        @media (max-width: 1024px) {
+          .sys-container {
+            flex-direction: column;
+          }
+          .glass-sidebar {
+            width: 100%;
+            height: auto;
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 16px;
+          }
+          .sidebar-brand {
+            margin-bottom: 16px;
+          }
+          .nav-menu {
+            flex-direction: row;
+            overflow-x: auto;
+            padding-bottom: 8px;
+          }
+          .nav-item {
+            white-space: nowrap;
+          }
+        }
+        @media (max-width: 768px) {
+          .main-content {
+            padding: 16px;
+          }
+          .stat-grid {
+            grid-template-columns: 1fr;
+          }
+          .modal-content-glass {
+            width: 95%;
+            padding: 24px;
+            margin: 16px;
+          }
+          .content-panel {
+            overflow-x: auto;
+          }
+          .panel-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+          }
+          .panel-header button {
+            width: 100%;
+          }
+          .custom-table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+          }
+          .sys-container > div:last-child {
+            /* Fix logout block on mobile */
+            flex-direction: row !important;
+            flex-wrap: wrap;
+          }
+        }
       `}</style>
 
       {notification && (

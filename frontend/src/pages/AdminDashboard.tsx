@@ -180,6 +180,28 @@ export default function AdminDashboard() {
           color: #2dd4bf;
           font-weight: 600;
         }
+        @media (max-width: 768px) {
+          .admin-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 16px;
+          }
+          .admin-container > div {
+            padding: 16px !important;
+          }
+          .stat-grid-admin {
+            grid-template-columns: 1fr;
+          }
+          .table-admin {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+          }
+          .content-panel-admin {
+            padding: 16px;
+          }
+        }
       `}</style>
 
       {/* Header */}

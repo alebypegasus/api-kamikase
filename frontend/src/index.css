@@ -795,11 +795,122 @@ body {
   text-decoration: underline;
 }
 
+
 .auth-switch-text {
   margin-top: 24px;
   text-align: center;
   font-size: 14px;
   color: var(--text-muted);
+}
+
+/* RESPONSIVE DESIGN - TABLET & MOBILE */
+@media (max-width: 1024px) {
+  .dashboard-container {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px 20px;
+    justify-content: space-between;
+    z-index: 100;
+  }
+  .sidebar-brand {
+    margin-bottom: 0;
+  }
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    gap: 12px;
+  }
+  .sidebar-footer {
+    border-top: none;
+    border-left: 1px solid var(--border-color);
+    padding-top: 0;
+    padding-left: 16px;
+    flex-direction: row;
+    align-items: center;
+  }
+  .main-content {
+    max-width: 100%;
+    padding: 24px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .auth-card {
+    padding: 24px;
+    border-radius: var(--radius-lg);
+  }
+  .auth-title {
+    font-size: 24px;
+  }
+  .main-content {
+    padding: 16px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  .sidebar-nav {
+    width: 100%;
+    margin-top: 16px;
+    justify-content: flex-start;
+  }
+  .sidebar-footer {
+    border-left: none;
+    padding-left: 0;
+  }
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .page-title {
+    font-size: 24px;
+  }
+  .card-header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .card-header-actions button {
+    width: 100%;
+  }
+  .modal-content {
+    padding: 24px;
+    margin: 16px;
+  }
+  .table-wrapper, .custom-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+  .custom-table th, .custom-table td {
+    padding: 12px 16px;
+    white-space: nowrap;
+  }
+  .alert-toast {
+    min-width: 0;
+    width: 100%;
+    padding: 12px 16px;
+  }
+  .alert-container {
+    left: 16px;
+    right: 16px;
+    top: 16px;
+  }
 }
 
 .auth-switch-btn {

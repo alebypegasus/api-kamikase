@@ -331,6 +331,49 @@ export default function PDV() {
           outline: none;
           border-color: #8b5cf6;
         }
+        .pdv-main-layout {
+          display: flex;
+          flex-grow: 1;
+          overflow: hidden;
+        }
+        .pdv-catalog {
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+          padding: 24px;
+          overflow-y: auto;
+        }
+        .pdv-cart-sidebar {
+          width: 400px;
+        }
+        .pdv-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 20px;
+        }
+        @media (max-width: 1024px) {
+          .pdv-header {
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+          }
+          .pdv-main-layout {
+            flex-direction: column;
+            overflow-y: auto;
+          }
+          .pdv-catalog {
+            padding: 16px;
+            overflow-y: visible;
+          }
+          .pdv-cart-sidebar {
+            width: 100%;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+          }
+          .pdv-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+          }
+        }
       `}</style>
 
       {/* Top Navbar */}
@@ -383,10 +426,10 @@ export default function PDV() {
       )}
 
       {/* Main Content Area */}
-      <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+      <div className="pdv-main-layout">
         
         {/* Left Side: Catalog */}
-        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', padding: '24px', overflowY: 'auto' }}>
+        <div className="pdv-catalog">
           
           {/* Categories Hierarchical Filter */}
           <div style={{ marginBottom: '24px' }}>
@@ -433,7 +476,7 @@ export default function PDV() {
           </div>
 
           {/* Products Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
+          <div className="pdv-grid">
             {filteredProdutos.map(prod => (
               <div 
                 key={prod.id} 
@@ -473,7 +516,7 @@ export default function PDV() {
         </div>
 
         {/* Right Side: Cart Glass Panel */}
-        <div className="glass-panel" style={{ width: '400px', display: 'flex', flexDirection: 'column', borderTop: 'none', borderRight: 'none', borderBottom: 'none' }}>
+        <div className="glass-panel pdv-cart-sidebar" style={{ display: 'flex', flexDirection: 'column', borderTop: 'none', borderRight: 'none', borderBottom: 'none' }}>
           
           <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
