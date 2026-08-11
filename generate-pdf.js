@@ -1,10 +1,16 @@
 import fs from 'fs';
+import path from 'path';
 import { marked } from 'marked';
 import puppeteer from 'puppeteer';
 
 async function generatePDF() {
   console.log('Reading README.md...');
-  const mdContent = fs.readFileSync('Docs/README.md', 'utf-8');
+  let mdContent = fs.readFileSync('Docs/README.md', 'utf-8');
+  
+  // Resolve local image paths using base64 embedding
+  const imagePath = path.resolve('Docs/Diagram.png');
+  const imageBase64 = fs.readFileSync(imagePath, 'base64');
+  mdContent = mdContent.replace(/\.\/Diagram\.png/g, `data:image/png;base64,${imageBase64}`);
   
   console.log('Converting to HTML...');
   const htmlContent = `
