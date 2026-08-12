@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import SearchInput from '../components/SearchInput';
+import QuantitySelector from '../components/QuantitySelector';
+import { SkeletonGrid } from '../components/Skeleton';
 
 interface Produto {
   id: number;
@@ -30,11 +33,14 @@ export default function PDV() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [activeParentCategory, setActiveParentCategory] = useState<number | null>(null);
   const [activeChildCategory, setActiveChildCategory] = useState<number | null>(null);
 
   const [notification, setNotification] = useState<string | null>(null);
+  const [addedProductId, setAddedProductId] = useState<number | null>(null);
 
   // Checkout states
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -42,13 +48,51 @@ export default function PDV() {
   const [formaPagamento, setFormaPagamento] = useState<string>('Dinheiro');
   const [parcelas, setParcelas] = useState<number>(1);
 
+  // Clock
+  const [clock, setClock] = useState('');
+
+  const searchRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    fetchCategorias();
-    fetchProdutos();
-    // Inject dark mode styles specifically for PDV
+    const fetchData = async () => {
+      setLoading(true);
+      await Promise.all([fetchCategorias(), fetchProdutos()]);
+      setLoading(false);
+    };
+    fetchData();
+
     document.body.classList.add('dark-pdv');
     return () => document.body.classList.remove('dark-pdv');
   }, []);
+
+  // Clock update
+  useEffect(() => {
+    const updateClock = () => {
+      setClock(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === 'F12' && cart.length > 0) {
+        e.preventDefault();
+        setIsCheckoutModalOpen(true);
+      }
+      if (e.key === 'Escape' && isCheckoutModalOpen) {
+        setIsCheckoutModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart.length, isCheckoutModalOpen]);
 
   const fetchCategorias = async () => {
     try {
@@ -64,7 +108,7 @@ export default function PDV() {
     } catch (err) { console.error(err); }
   };
 
-  const addToCart = (produto: Produto) => {
+  const addToCart = useCallback((produto: Produto) => {
     if (produto.estoque <= 0) {
       showNotification('Produto sem estoque!');
       return;
@@ -83,13 +127,24 @@ export default function PDV() {
       }
       return [...prev, { ...produto, quantidade: 1 }];
     });
-  };
 
-  const removeFromCart = (id: number) => {
+    // Show "added" badge
+    setAddedProductId(produto.id);
+    setTimeout(() => setAddedProductId(null), 800);
+  }, []);
+
+  const updateCartQuantity = useCallback((id: number, newQty: number) => {
+    setCart(prev => prev.map(item => 
+      item.id === id ? { ...item, quantidade: newQty } : item
+    ));
+  }, []);
+
+  const removeFromCart = useCallback((id: number) => {
     setCart(prev => prev.filter(item => item.id !== id));
-  };
+  }, []);
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+  const cartItemCount = cart.reduce((acc, item) => acc + item.quantidade, 0);
   
   const descontoPercent = Math.min(20, Math.max(0, desconto));
   const descontoAmount = cartTotal * (descontoPercent / 100);
@@ -133,7 +188,7 @@ export default function PDV() {
       setDesconto(0);
       setFormaPagamento('Dinheiro');
       setParcelas(1);
-      fetchProdutos(); // refresh stock
+      fetchProdutos();
     } catch (err) {
       console.error(err);
       showNotification('Erro ao processar venda.');
@@ -152,6 +207,11 @@ export default function PDV() {
     : [];
 
   const filteredProdutos = produtos.filter(p => {
+    // Search filter
+    if (searchTerm && !p.nome.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    // Category filter
     if (activeChildCategory) return p.categorias_id === activeChildCategory;
     if (activeParentCategory) {
       const childrenIds = categorias.filter(c => c.parent_id === activeParentCategory).map(c => c.id);
@@ -160,250 +220,45 @@ export default function PDV() {
     return true;
   });
 
-  return (
-    <div className="pdv-premium-container">
-      {/* Global styles for this view specifically to enforce the dark/glass theme */}
-      <style>{`
-        .dark-pdv {
-          background: #0f111a;
-          color: #e2e8f0;
-          font-family: 'Inter', system-ui, sans-serif;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-        }
-        .pdv-premium-container {
-          height: 100vh;
-          display: flex;
-          flex-direction: column;
-          background: radial-gradient(circle at 15% 50%, rgba(20, 184, 166, 0.05), transparent 25%),
-                      radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
-        }
-        .glass-panel {
-          background: rgba(30, 41, 59, 0.6);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .pdv-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px 32px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          z-index: 10;
-        }
-        .pdv-nav-btn {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #e2e8f0;
-          border-radius: 8px;
-          padding: 8px 16px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .pdv-nav-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: rgba(255, 255, 255, 0.2);
-        }
-        .pdv-cat-btn {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          color: #94a3b8;
-          padding: 12px 20px;
-          border-radius: 30px;
-          cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .pdv-cat-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #fff;
-        }
-        .pdv-cat-btn.active {
-          background: linear-gradient(135deg, #14b8a6, #0d9488);
-          color: #fff;
-          border-color: transparent;
-          box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
-        }
-        .pdv-cat-btn.active-child {
-          background: rgba(139, 92, 246, 0.2);
-          color: #c4b5fd;
-          border-color: rgba(139, 92, 246, 0.4);
-        }
-        .pdv-product-card {
-          background: rgba(30, 41, 59, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
-          padding: 20px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          overflow: hidden;
-        }
-        .pdv-product-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0; height: 4px;
-          background: linear-gradient(90deg, #14b8a6, #8b5cf6);
-          opacity: 0;
-          transition: opacity 0.3s ease;
-        }
-        .pdv-product-card:hover {
-          transform: translateY(-4px);
-          background: rgba(30, 41, 59, 0.8);
-          border-color: rgba(255, 255, 255, 0.1);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-        .pdv-product-card:hover::before {
-          opacity: 1;
-        }
-        .pdv-product-card.disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-          filter: grayscale(1);
-        }
-        .pdv-product-card.disabled:hover {
-          transform: none;
-        }
-        .pdv-cart-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px;
-          background: rgba(15, 23, 42, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 12px;
-          margin-bottom: 12px;
-          transition: background 0.2s;
-        }
-        .pdv-cart-item:hover {
-          background: rgba(15, 23, 42, 0.8);
-        }
-        .pdv-btn-gradient {
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          color: white;
-          border: none;
-          padding: 16px;
-          border-radius: 12px;
-          font-weight: bold;
-          font-size: 16px;
-          cursor: pointer;
-          transition: opacity 0.2s, transform 0.1s;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-        .pdv-btn-gradient:hover {
-          opacity: 0.9;
-        }
-        .pdv-btn-gradient:active {
-          transform: scale(0.98);
-        }
-        .pdv-btn-gradient:disabled {
-          background: #334155;
-          color: #94a3b8;
-          box-shadow: none;
-          cursor: not-allowed;
-        }
-        .neon-text {
-          background: linear-gradient(to right, #2dd4bf, #a78bfa);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .custom-input {
-          background: rgba(15, 23, 42, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: white;
-          padding: 12px 16px;
-          border-radius: 8px;
-          width: 100%;
-          transition: border-color 0.2s;
-        }
-        .custom-input:focus {
-          outline: none;
-          border-color: #8b5cf6;
-        }
-        .pdv-main-layout {
-          display: flex;
-          flex-grow: 1;
-          overflow: hidden;
-        }
-        .pdv-catalog {
-          flex-grow: 1;
-          display: flex;
-          flex-direction: column;
-          padding: 24px;
-          overflow-y: auto;
-        }
-        .pdv-cart-sidebar {
-          width: 400px;
-        }
-        .pdv-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 20px;
-        }
-        @media (max-width: 1024px) {
-          .pdv-header {
-            flex-direction: column;
-            gap: 16px;
-            padding: 16px;
-          }
-          .pdv-main-layout {
-            flex-direction: column;
-            overflow-y: auto;
-          }
-          .pdv-catalog {
-            padding: 16px;
-            overflow-y: visible;
-          }
-          .pdv-cart-sidebar {
-            width: 100%;
-            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-          }
-          .pdv-grid {
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 12px;
-          }
-        }
-      `}</style>
+  const getStockBadgeClass = (estoque: number) => {
+    if (estoque <= 0) return 'out-of-stock';
+    if (estoque <= 5) return 'low-stock';
+    return 'in-stock';
+  };
 
+  const getStockLabel = (estoque: number) => {
+    if (estoque <= 0) return 'Esgotado';
+    if (estoque <= 5) return `${estoque} un ⚠`;
+    return `${estoque} un`;
+  };
+
+  return (
+    <div className="pdv-premium-container page-transition">
       {/* Top Navbar */}
       <header className="glass-panel pdv-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            width: '40px', height: '40px', 
-            background: 'linear-gradient(135deg, #14b8a6, #8b5cf6)', 
-            borderRadius: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)'
-          }}>
+        <div className="pdv-header-left">
+          <div className="pdv-logo-icon">
             <Cpu size={24} color="white" />
           </div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }} className="neon-text">
+          <h2 className="pdv-brand neon-text">
             Kamikase ERP & PDV
           </h2>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="pdv-header-right">
+          <span className="pdv-clock">{clock}</span>
+
           <button className="pdv-nav-btn" onClick={() => navigate('/system')}>
-            <Layers size={16} /> <span style={{fontSize:'14px'}}>Sistema</span>
+            <Layers size={16} /> <span>Sistema</span>
+            <span className="kbd-hint">Alt+S</span>
           </button>
           
-          <div style={{ width: '1px', height: '24px', background: 'rgba(255,255,255,0.1)' }}></div>
+          <div className="pdv-divider" />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{userName}</div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>Caixa Aberto</div>
+          <div className="pdv-user-info">
+            <div className="pdv-user-details">
+              <div className="pdv-user-name">{userName}</div>
+              <div className="pdv-user-status">Caixa Aberto</div>
             </div>
             <button onClick={handleLogout} className="pdv-nav-btn" style={{ padding: '8px', color: '#ef4444' }} title="Sair">
               <LogOut size={18} />
@@ -413,13 +268,7 @@ export default function PDV() {
       </header>
 
       {notification && (
-        <div style={{ 
-          position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', 
-          zIndex: 1100, background: 'rgba(20, 184, 166, 0.9)', backdropFilter: 'blur(8px)',
-          color: 'white', padding: '12px 24px', borderRadius: '30px',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)', fontWeight: 500
-        }}>
+        <div className="pdv-notification">
           <CheckCircle size={18} />
           {notification}
         </div>
@@ -431,19 +280,30 @@ export default function PDV() {
         {/* Left Side: Catalog */}
         <div className="pdv-catalog">
           
+          {/* Search Bar */}
+          <div className="pdv-search-area">
+            <SearchInput 
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Buscar produtos... (F2)"
+              className="animate-fade-in"
+            />
+          </div>
+
           {/* Categories Hierarchical Filter */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div className="pdv-categories">
+            <div className="pdv-cat-row">
               <button 
                 className={`pdv-cat-btn ${activeParentCategory === null ? 'active' : ''}`}
                 onClick={() => { setActiveParentCategory(null); setActiveChildCategory(null); }}
               >
                 <Layers size={16} /> Todos os Setores
               </button>
-              {parentCategories.map(cat => (
+              {parentCategories.map((cat, i) => (
                 <button 
                   key={cat.id}
-                  className={`pdv-cat-btn ${activeParentCategory === cat.id ? 'active' : ''}`}
+                  className={`pdv-cat-btn animate-fade-in animate-stagger-${Math.min(i + 1, 8)}`}
+                  style={activeParentCategory === cat.id ? { background: 'linear-gradient(135deg, #14b8a6, #0d9488)', color: '#fff', borderColor: 'transparent', boxShadow: '0 4px 12px rgba(20, 184, 166, 0.3)' } : {}}
                   onClick={() => { setActiveParentCategory(cat.id); setActiveChildCategory(null); }}
                 >
                   <Server size={16} /> {cat.nome}
@@ -451,12 +311,11 @@ export default function PDV() {
               ))}
             </div>
 
-            {/* Subcategories (if parent selected) */}
+            {/* Subcategories */}
             {activeParentCategory && childCategories.length > 0 && (
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingLeft: '16px', borderLeft: '2px solid rgba(139, 92, 246, 0.3)' }}>
+              <div className="pdv-subcat-row animate-fade-in">
                 <button 
-                  className={`pdv-cat-btn ${activeChildCategory === null ? 'active-child' : ''}`}
-                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  className={`pdv-cat-btn small ${activeChildCategory === null ? 'active-child' : ''}`}
                   onClick={() => setActiveChildCategory(null)}
                 >
                   Ver tudo
@@ -464,8 +323,7 @@ export default function PDV() {
                 {childCategories.map(cat => (
                   <button 
                     key={cat.id}
-                    className={`pdv-cat-btn ${activeChildCategory === cat.id ? 'active-child' : ''}`}
-                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                    className={`pdv-cat-btn small ${activeChildCategory === cat.id ? 'active-child' : ''}`}
                     onClick={() => setActiveChildCategory(cat.id)}
                   >
                     {cat.nome}
@@ -476,88 +334,109 @@ export default function PDV() {
           </div>
 
           {/* Products Grid */}
-          <div className="pdv-grid">
-            {filteredProdutos.map(prod => (
-              <div 
-                key={prod.id} 
-                className={`pdv-product-card ${prod.estoque <= 0 ? 'disabled' : ''}`}
-                onClick={() => prod.estoque > 0 && addToCart(prod)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Monitor size={24} color="#a78bfa" />
+          {loading ? (
+            <SkeletonGrid count={8} />
+          ) : (
+            <div className="pdv-grid">
+              {filteredProdutos.map((prod, i) => (
+                <div 
+                  key={prod.id} 
+                  className={`pdv-product-card ${prod.estoque <= 0 ? 'disabled' : ''} animate-fade-in animate-stagger-${Math.min(i + 1, 8)}`}
+                  onClick={() => prod.estoque > 0 && addToCart(prod)}
+                >
+                  {addedProductId === prod.id && (
+                    <div className="pdv-added-badge">✓ Adicionado</div>
+                  )}
+                  
+                  <div className="pdv-product-top">
+                    <div className="pdv-product-icon">
+                      <Monitor size={24} color="#a78bfa" />
+                    </div>
+                    <div className={`pdv-stock-badge ${getStockBadgeClass(prod.estoque)}`}>
+                      {getStockLabel(prod.estoque)}
+                    </div>
                   </div>
-                  <div style={{ background: prod.estoque > 0 ? 'rgba(20, 184, 166, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: prod.estoque > 0 ? '#2dd4bf' : '#f87171', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>
-                    {prod.estoque > 0 ? `${prod.estoque} un` : 'Esgotado'}
+                  
+                  <h3 className="pdv-product-name">{prod.nome}</h3>
+                  
+                  <div className="pdv-product-bottom">
+                    <span className="pdv-product-price">
+                      <span className="pdv-product-price-prefix">R$</span>
+                      {Number(prod.preco).toFixed(2)}
+                    </span>
+                    <div className="pdv-add-btn">
+                      <Plus size={14} color="#e2e8f0" />
+                    </div>
                   </div>
                 </div>
-                
-                <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '4px', lineHeight: 1.3 }}>{prod.nome}</h3>
-                
-                <div style={{ marginTop: 'auto', paddingTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '20px', fontWeight: 700, color: '#2dd4bf' }}>
-                    <span style={{ fontSize: '12px', color: '#94a3b8', marginRight: '2px' }}>R$</span>
-                    {Number(prod.preco).toFixed(2)}
-                  </span>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Plus size={14} color="#e2e8f0" />
-                  </div>
+              ))}
+              
+              {filteredProdutos.length === 0 && !loading && (
+                <div className="pdv-empty-state">
+                  <Zap size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
+                  <p>{searchTerm ? `Nenhum item encontrado para "${searchTerm}".` : 'Nenhum item encontrado nesta categoria.'}</p>
                 </div>
-              </div>
-            ))}
-            
-            {filteredProdutos.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <Zap size={48} opacity={0.2} style={{ margin: '0 auto 16px' }} />
-                <p>Nenhum item encontrado nesta categoria.</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Side: Cart Glass Panel */}
-        <div className="glass-panel pdv-cart-sidebar" style={{ display: 'flex', flexDirection: 'column', borderTop: 'none', borderRight: 'none', borderBottom: 'none' }}>
+        <div className="glass-panel pdv-cart-sidebar">
           
-          <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="pdv-cart-header">
+            <h2>
               <ShoppingBag size={20} className="neon-text" /> 
               Resumo do Pedido
+              {cartItemCount > 0 && (
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px', 
+                  fontSize: '12px', 
+                  fontWeight: 700, 
+                  marginLeft: '8px' 
+                }}>
+                  {cartItemCount}
+                </span>
+              )}
             </h2>
           </div>
           
-          <div style={{ flexGrow: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+          <div className="pdv-cart-body">
             {cart.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.5 }}>
-                <ShoppingBag size={64} style={{ marginBottom: '16px', color: '#64748b' }} />
-                <p style={{ color: '#94a3b8' }}>Aguardando itens...</p>
+              <div className="pdv-cart-empty">
+                <ShoppingBag size={64} style={{ color: '#64748b' }} />
+                <p>Aguardando itens...</p>
               </div>
             ) : (
               cart.map(item => (
                 <div key={item.id} className="pdv-cart-item">
-                  <div style={{ flex: 1, paddingRight: '12px' }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: 500, margin: '0 0 4px 0', color: '#f1f5f9' }}>{item.nome}</h4>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{item.quantidade} un x R$ {Number(item.preco).toFixed(2)}</span>
+                  <div className="pdv-cart-item-info">
+                    <h4 className="pdv-cart-item-name">{item.nome}</h4>
+                    <span className="pdv-cart-item-qty">R$ {Number(item.preco).toFixed(2)} / un</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, color: '#e2e8f0' }}>R$ {(item.quantidade * item.preco).toFixed(2)}</span>
-                    <button 
-                      onClick={() => removeFromCart(item.id)}
-                      style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}
-                    >
-                      Remover
-                    </button>
+                  <div className="pdv-cart-item-right">
+                    <span className="pdv-cart-item-total">R$ {(item.quantidade * item.preco).toFixed(2)}</span>
+                    <QuantitySelector
+                      value={item.quantidade}
+                      max={item.estoque}
+                      onChange={(newQty) => updateCartQuantity(item.id, newQty)}
+                      onRemove={() => removeFromCart(item.id)}
+                    />
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          <div style={{ padding: '24px', background: 'rgba(15, 23, 42, 0.6)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#94a3b8' }}>
-              <span>Subtotal</span>
+          <div className="pdv-cart-footer">
+            <div className="pdv-cart-subtotal">
+              <span>Subtotal ({cartItemCount} itens)</span>
               <span>R$ {cartTotal.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '24px', fontWeight: 800, color: '#fff' }}>
+            <div className="pdv-cart-total">
               <span>Total</span>
               <span className="neon-text">R$ {cartTotal.toFixed(2)}</span>
             </div>
@@ -569,33 +448,34 @@ export default function PDV() {
               onClick={() => setIsCheckoutModalOpen(true)}
             >
               Processar Pagamento <ChevronRight size={20} />
+              <span className="kbd-hint" style={{ marginLeft: '4px' }}>F12</span>
             </button>
           </div>
         </div>
 
       </div>
 
-      {/* Checkout Modal Glass */}
+      {/* Checkout Modal */}
       {isCheckoutModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1e293b', padding: '32px', borderRadius: '24px', width: '420px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+        <div className="glass-modal" onClick={() => setIsCheckoutModalOpen(false)}>
+          <div className="modal-content-glass" style={{ width: '420px' }} onClick={e => e.stopPropagation()}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'white' }}>Checkout</h2>
-              <button onClick={() => setIsCheckoutModalOpen(false)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '8px', borderRadius: '50%' }}>
+            <div className="modal-header" style={{ marginBottom: '32px' }}>
+              <h2 className="modal-title">Checkout</h2>
+              <button onClick={() => setIsCheckoutModalOpen(false)} className="modal-close" style={{ padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }}>
                 <X size={20} />
               </button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              <div style={{ background: 'rgba(15,23,42,0.5)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '4px' }}>Subtotal da Compra</label>
+              <div style={{ background: 'var(--bg-deep)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Subtotal da Compra</label>
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#e2e8f0' }}>R$ {cartTotal.toFixed(2)}</div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Desconto Aplicado (%) - Máx 20%</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Desconto Aplicado (%) - Máx 20%</label>
                 <input 
                   type="number" min="0" max="20" step="1"
                   className="custom-input" 
@@ -610,7 +490,7 @@ export default function PDV() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Método de Pagamento</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Método de Pagamento</label>
                 <select 
                   className="custom-input" 
                   value={formaPagamento}
@@ -625,8 +505,8 @@ export default function PDV() {
               </div>
 
               {formaPagamento === 'Cartão de Crédito' && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>Parcelamento</label>
+                <div className="animate-fade-in">
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Parcelamento</label>
                   <select 
                     className="custom-input" 
                     value={parcelas} 
@@ -656,7 +536,7 @@ export default function PDV() {
                     <span>- R$ {descontoAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '4px' }}>Valor a Cobrar</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Valor a Cobrar</label>
                 <div style={{ fontSize: '32px', fontWeight: 800, color: '#2dd4bf' }}>R$ {finalTotal.toFixed(2)}</div>
               </div>
 

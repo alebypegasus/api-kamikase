@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu } from 'lucide-react';
+import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import AnimatedCounter from '../components/AnimatedCounter';
+import SearchInput from '../components/SearchInput';
+import { useConfirm } from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
+import Skeleton, { SkeletonTable } from '../components/Skeleton';
 
 interface Produto {
   id: number;
@@ -22,8 +27,11 @@ interface Categoria {
 export default function SystemDashboard() {
   const { userName, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const { confirm } = useConfirm();
+  const { addToast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'produtos' | 'categorias'>('dashboard');
+  const [loading, setLoading] = useState(true);
   
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -32,7 +40,9 @@ export default function SystemDashboard() {
   const [totalCategorias, setTotalCategorias] = useState(0);
   const [vendas, setVendas] = useState<any[]>([]);
   
-  const [notification, setNotification] = useState<string | null>(null);
+  const [searchProdutos, setSearchProdutos] = useState('');
+  const [vendasPage, setVendasPage] = useState(1);
+  const vendasPerPage = 10;
 
   // Modals state
   const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
@@ -48,17 +58,13 @@ export default function SystemDashboard() {
   const [produtoEstoque, setProdutoEstoque] = useState('0');
   const [produtoCategoriaId, setProdutoCategoriaId] = useState('');
 
-  const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   useEffect(() => {
-    fetchCategorias();
-    fetchProdutos();
-    fetchStats();
-    fetchVendas();
-    // Inject dark theme globally for this screen
+    const fetchAll = async () => {
+      setLoading(true);
+      await Promise.all([fetchCategorias(), fetchProdutos(), fetchStats(), fetchVendas()]);
+      setLoading(false);
+    };
+    fetchAll();
     document.body.classList.add('dark-dashboard');
     return () => document.body.classList.remove('dark-dashboard');
   }, []);
@@ -99,6 +105,22 @@ export default function SystemDashboard() {
     navigate('/');
   };
 
+  // Computed
+  const valorTotalEstoque = produtos.reduce((acc, p) => acc + (Number(p.preco) * p.estoque), 0);
+
+  const filteredProdutos = searchProdutos
+    ? produtos.filter(p => p.nome.toLowerCase().includes(searchProdutos.toLowerCase()))
+    : produtos;
+
+  const totalVendasPages = Math.ceil(vendas.length / vendasPerPage);
+  const paginatedVendas = vendas.slice((vendasPage - 1) * vendasPerPage, vendasPage * vendasPerPage);
+
+  const getStockBadge = (estoque: number) => {
+    if (estoque <= 0) return { className: 'low', label: `${estoque} un` };
+    if (estoque <= 5) return { className: 'medium', label: `${estoque} un` };
+    return { className: 'high', label: `${estoque} un` };
+  };
+
   // CATEGORIA HANDLERS
   const openAddCategoria = () => {
     setSelectedCategoria(null);
@@ -116,7 +138,10 @@ export default function SystemDashboard() {
 
   const handleSaveCategoria = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!categoriaNome.trim()) return showNotification('Nome obrigatório');
+    if (!categoriaNome.trim()) {
+      addToast('warning', 'Nome da categoria é obrigatório.');
+      return;
+    }
 
     try {
       const url = selectedCategoria 
@@ -134,21 +159,28 @@ export default function SystemDashboard() {
           await api.post(url, data);
       }
 
-      showNotification(selectedCategoria ? 'Categoria atualizada' : 'Categoria criada');
+      addToast('success', selectedCategoria ? 'Categoria atualizada com sucesso.' : 'Categoria criada com sucesso.');
       fetchCategorias();
       fetchStats();
       setCategoriaModalOpen(false);
     } catch (err: any) {
       console.error(err);
-      showNotification(err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar categoria');
+      addToast('danger', err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar categoria.');
     }
   };
 
   const deleteCategoria = async (id: number) => {
-    if (!confirm('Excluir categoria? Produtos podem ficar órfãos.')) return;
+    const confirmed = await confirm({
+      title: 'Excluir Categoria',
+      message: 'Tem certeza que deseja excluir esta categoria? Produtos vinculados podem ficar sem categoria.',
+      confirmText: 'Excluir',
+      type: 'danger',
+    });
+    if (!confirmed) return;
+    
     try {
       await api.delete(`/categorias/${id}`);
-      showNotification('Categoria excluída.');
+      addToast('success', 'Categoria excluída com sucesso.');
       fetchCategorias();
       fetchStats();
     } catch (err) { console.error(err); }
@@ -178,7 +210,8 @@ export default function SystemDashboard() {
   const handleSaveProduto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!produtoNome || !produtoPreco || !produtoCategoriaId) {
-      return showNotification('Todos os campos são obrigatórios');
+      addToast('warning', 'Todos os campos obrigatórios devem ser preenchidos.');
+      return;
     }
 
     const payload = {
@@ -200,308 +233,41 @@ export default function SystemDashboard() {
           await api.post(url, payload);
       }
 
-      showNotification(selectedProduto ? 'Produto atualizado' : 'Produto criado');
+      addToast('success', selectedProduto ? 'Produto atualizado com sucesso.' : 'Produto criado com sucesso.');
       fetchProdutos();
       fetchStats();
       setProdutoModalOpen(false);
     } catch (err: any) {
       console.error(err);
-      showNotification(err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar produto');
+      addToast('danger', err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao salvar produto.');
     }
   };
 
   const deleteProduto = async (id: number) => {
-    if (!confirm('Excluir produto?')) return;
+    const confirmed = await confirm({
+      title: 'Excluir Produto',
+      message: 'Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      type: 'danger',
+    });
+    if (!confirmed) return;
+
     try {
       await api.delete(`/produtos/${id}`);
-      showNotification('Produto excluído.');
+      addToast('success', 'Produto excluído com sucesso.');
       fetchProdutos();
       fetchStats();
     } catch (err) { console.error(err); }
   };
 
   return (
-    <div className="sys-container">
-      <style>{`
-        .dark-dashboard {
-          background: #0f111a;
-          color: #e2e8f0;
-          font-family: 'Inter', system-ui, sans-serif;
-          margin: 0;
-          padding: 0;
-          min-height: 100vh;
-        }
-        .sys-container {
-          display: flex;
-          height: 100vh;
-          background: radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.05), transparent 30%),
-                      radial-gradient(circle at 0% 100%, rgba(139, 92, 246, 0.08), transparent 30%);
-        }
-        .glass-sidebar {
-          width: 280px;
-          background: rgba(15, 23, 42, 0.6);
-          backdrop-filter: blur(12px);
-          border-right: 1px solid rgba(255, 255, 255, 0.05);
-          display: flex;
-          flex-direction: column;
-          padding: 24px;
-        }
-        .sidebar-brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 48px;
-          padding: 0 8px;
-        }
-        .brand-icon {
-          background: linear-gradient(135deg, #14b8a6, #8b5cf6);
-          padding: 8px;
-          border-radius: 10px;
-          color: white;
-          box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
-        }
-        .nav-menu {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          border-radius: 12px;
-          color: #94a3b8;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: 1px solid transparent;
-        }
-        .nav-item:hover {
-          background: rgba(255, 255, 255, 0.03);
-          color: #e2e8f0;
-        }
-        .nav-item.active {
-          background: rgba(20, 184, 166, 0.1);
-          color: #2dd4bf;
-          border-color: rgba(20, 184, 166, 0.2);
-        }
-        .main-content {
-          flex: 1;
-          padding: 40px;
-          overflow-y: auto;
-        }
-        .page-header {
-          margin-bottom: 32px;
-        }
-        .neon-text {
-          background: linear-gradient(to right, #2dd4bf, #a78bfa);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          font-weight: 800;
-        }
-        .stat-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 24px;
-          margin-bottom: 32px;
-        }
-        .stat-card {
-          background: rgba(30, 41, 59, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
-          padding: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          transition: transform 0.2s;
-        }
-        .stat-card:hover {
-          transform: translateY(-4px);
-          background: rgba(30, 41, 59, 0.6);
-        }
-        .stat-icon {
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .content-panel {
-          background: rgba(30, 41, 59, 0.4);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
-          overflow: hidden;
-        }
-        .panel-header {
-          padding: 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .custom-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        .custom-table th, .custom-table td {
-          padding: 16px 24px;
-          text-align: left;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-        }
-        .custom-table th {
-          color: #94a3b8;
-          font-weight: 500;
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .custom-table tr:hover td {
-          background: rgba(255, 255, 255, 0.02);
-        }
-        .btn-gradient {
-          background: linear-gradient(135deg, #14b8a6, #0d9488);
-          color: white;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 8px;
-          font-weight: 600;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          transition: opacity 0.2s;
-          box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
-        }
-        .btn-gradient:hover {
-          opacity: 0.9;
-        }
-        .btn-icon {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #e2e8f0;
-          border-radius: 6px;
-          padding: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-icon:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .btn-icon.danger:hover {
-          background: rgba(239, 68, 68, 0.2);
-          color: #f87171;
-          border-color: rgba(239, 68, 68, 0.3);
-        }
-        .glass-modal {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(8px);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 1000;
-        }
-        .modal-content-glass {
-          background: #1e293b;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 20px;
-          width: 500px;
-          padding: 32px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        .input-glass {
-          background: rgba(15, 23, 42, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: white;
-          padding: 12px 16px;
-          border-radius: 8px;
-          width: 100%;
-          margin-top: 6px;
-          transition: border-color 0.2s;
-          box-sizing: border-box;
-        }
-        .input-glass:focus {
-          outline: none;
-          border-color: #2dd4bf;
-        }
-        .badge-cat {
-          background: rgba(139, 92, 246, 0.1);
-          color: #c4b5fd;
-          border: 1px solid rgba(139, 92, 246, 0.2);
-          padding: 4px 10px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-        @media (max-width: 1024px) {
-          .sys-container {
-            flex-direction: column;
-          }
-          .glass-sidebar {
-            width: 100%;
-            height: auto;
-            border-right: none;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 16px;
-          }
-          .sidebar-brand {
-            margin-bottom: 16px;
-          }
-          .nav-menu {
-            flex-direction: row;
-            overflow-x: auto;
-            padding-bottom: 8px;
-          }
-          .nav-item {
-            white-space: nowrap;
-          }
-        }
-        @media (max-width: 768px) {
-          .main-content {
-            padding: 16px;
-          }
-          .stat-grid {
-            grid-template-columns: 1fr;
-          }
-          .modal-content-glass {
-            width: 95%;
-            padding: 24px;
-            margin: 16px;
-          }
-          .content-panel {
-            overflow-x: auto;
-          }
-          .panel-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 16px;
-          }
-          .panel-header button {
-            width: 100%;
-          }
-          .custom-table {
-            display: block;
-            overflow-x: auto;
-            white-space: nowrap;
-          }
-          .sys-container > div:last-child {
-            /* Fix logout block on mobile */
-            flex-direction: row !important;
-            flex-wrap: wrap;
-          }
-        }
-      `}</style>
-
-      {notification && (
-        <div style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 1100, background: 'rgba(20, 184, 166, 0.9)', backdropFilter: 'blur(8px)', color: 'white', padding: '12px 24px', borderRadius: '30px', boxShadow: '0 4px 20px rgba(20, 184, 166, 0.4)', fontWeight: 500 }}>
-          {notification}
-        </div>
-      )}
+    <div className="sys-container page-transition">
 
       {/* Sidebar */}
       <aside className="glass-sidebar">
         <div className="sidebar-brand">
           <div className="brand-icon"><Cpu size={24} /></div>
-          <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }} className="neon-text">Kamikase ERP & PDV</span>
+          <span className="sidebar-brand-text neon-text">Kamikase ERP & PDV</span>
         </div>
 
         <nav className="nav-menu">
@@ -516,18 +282,18 @@ export default function SystemDashboard() {
           </div>
         </nav>
 
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="sidebar-bottom">
           <button className="btn-gradient" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/pdv')}>
             <ShoppingBag size={18} /> Ir para PDV
           </button>
 
-          <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-avatar">
               {userName?.charAt(0)}
             </div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{userName}</div>
-              <div style={{ fontSize: '12px', color: '#94a3b8' }}>{isAdmin ? 'Administrador' : 'Lojista'}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{userName}</div>
+              <div className="sidebar-user-role">{isAdmin ? 'Administrador' : 'Lojista'}</div>
             </div>
             <button onClick={handleLogout} className="btn-icon danger" style={{ border: 'none', background: 'transparent' }}>
               <LogOut size={18} />
@@ -537,165 +303,215 @@ export default function SystemDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="main-content">
+      <main className="sys-main-content">
         <div className="page-header">
-          <h1 style={{ fontSize: '28px', margin: 0, fontWeight: 700 }}>
+          <h1>
             {view === 'dashboard' && 'Visão Geral do Negócio'}
             {view === 'produtos' && 'Catálogo de Produtos'}
             {view === 'categorias' && 'Gestão de Categorias'}
           </h1>
-          <p style={{ color: '#94a3b8', margin: '4px 0 0 0' }}>Gerencie seu inventário e acompanhe resultados.</p>
+          <p>Gerencie seu inventário e acompanhe resultados.</p>
         </div>
 
         {view === 'dashboard' && (
-          <>
-            <div className="stat-grid">
-              <div className="stat-card">
-                <div>
-                  <div style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '8px' }}>Total de Produtos</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: '#fff' }}>{totalProdutos}</div>
+          <div className="view-transition">
+            {loading ? (
+              <div className="stat-grid">
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+              </div>
+            ) : (
+              <div className="stat-grid">
+                <div className="stat-card animate-fade-in animate-stagger-1">
+                  <div>
+                    <div className="stat-card-label">Total de Produtos</div>
+                    <div className="stat-card-value"><AnimatedCounter value={totalProdutos} /></div>
+                  </div>
+                  <div className="stat-icon purple"><Package size={28} /></div>
                 </div>
-                <div className="stat-icon" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                  <Package size={28} />
+                <div className="stat-card animate-fade-in animate-stagger-2">
+                  <div>
+                    <div className="stat-card-label">Categorias Ativas</div>
+                    <div className="stat-card-value"><AnimatedCounter value={totalCategorias} /></div>
+                  </div>
+                  <div className="stat-icon cyan"><Tag size={28} /></div>
+                </div>
+                <div className="stat-card animate-fade-in animate-stagger-3">
+                  <div>
+                    <div className="stat-card-label">Vendas Registradas</div>
+                    <div className="stat-card-value" style={{ color: 'var(--accent-light)' }}>
+                      <AnimatedCounter value={vendas.length} />
+                    </div>
+                  </div>
+                  <div className="stat-icon teal"><ShoppingBag size={28} /></div>
+                </div>
+                <div className="stat-card animate-fade-in animate-stagger-4">
+                  <div>
+                    <div className="stat-card-label">Valor em Estoque</div>
+                    <div className="stat-card-value" style={{ color: 'var(--accent-light)', fontSize: '22px' }}>
+                      <AnimatedCounter value={valorTotalEstoque} prefix="R$ " decimals={2} />
+                    </div>
+                  </div>
+                  <div className="stat-icon amber"><DollarSign size={28} /></div>
                 </div>
               </div>
-              <div className="stat-card">
-                <div>
-                  <div style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '8px' }}>Categorias Ativas</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: '#fff' }}>{totalCategorias}</div>
-                </div>
-                <div className="stat-icon" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                  <Tag size={28} />
-                </div>
-              </div>
-              <div className="stat-card">
-                <div>
-                  <div style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '8px' }}>Vendas Registradas</div>
-                  <div style={{ fontSize: '28px', fontWeight: 700, color: '#2dd4bf' }}>{vendas.length}</div>
-                </div>
-                <div className="stat-icon" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#2dd4bf', border: '1px solid rgba(20, 184, 166, 0.2)' }}>
-                  <ShoppingBag size={28} />
-                </div>
-              </div>
-            </div>
+            )}
 
-            <div className="content-panel">
+            <div className="content-panel animate-fade-in">
               <div className="panel-header">
-                <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 600 }}>Últimas Transações</h2>
+                <h2>Últimas Transações</h2>
+                {totalVendasPages > 1 && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button className="btn-icon" disabled={vendasPage <= 1} onClick={() => setVendasPage(p => p - 1)}>←</button>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{vendasPage}/{totalVendasPages}</span>
+                    <button className="btn-icon" disabled={vendasPage >= totalVendasPages} onClick={() => setVendasPage(p => p + 1)}>→</button>
+                  </div>
+                )}
               </div>
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Valor Total</th>
-                    <th>Data</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendas.length > 0 ? vendas.slice(0, 10).map(v => (
-                    <tr key={v.id}>
-                      <td style={{ color: '#94a3b8' }}>#{v.id}</td>
-                      <td style={{ fontWeight: 600, color: '#2dd4bf' }}>R$ {Number(v.valor_total).toFixed(2)}</td>
-                      <td>{new Date(v.created_at).toLocaleString()}</td>
+              {loading ? (
+                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={3} /></div>
+              ) : (
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Valor Total</th>
+                      <th>Data</th>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhuma venda registrada.</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedVendas.length > 0 ? paginatedVendas.map(v => (
+                      <tr key={v.id}>
+                        <td style={{ color: 'var(--text-muted)' }}>#{v.id}</td>
+                        <td className="price-text">R$ {Number(v.valor_total).toFixed(2)}</td>
+                        <td>{new Date(v.created_at).toLocaleString('pt-BR')}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma venda registrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
-          </>
+          </div>
         )}
 
         {view === 'produtos' && (
-          <div className="content-panel">
-            <div className="panel-header">
-              <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 600 }}>Produtos Cadastrados</h2>
-              <button className="btn-gradient" onClick={openAddProduto}>
-                <Plus size={16} /> Novo Produto
-              </button>
+          <div className="view-transition">
+            <div className="content-panel">
+              <div className="panel-header">
+                <div className="panel-header-actions">
+                  <h2>Produtos Cadastrados</h2>
+                  <SearchInput 
+                    value={searchProdutos} 
+                    onChange={setSearchProdutos}
+                    placeholder="Filtrar produtos..."
+                    className="animate-fade-in"
+                  />
+                </div>
+                <button className="btn-gradient" onClick={openAddProduto}>
+                  <Plus size={16} /> Novo Produto
+                </button>
+              </div>
+              {loading ? (
+                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={4} /></div>
+              ) : (
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Preço</th>
+                      <th>Estoque</th>
+                      <th style={{ textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProdutos.length > 0 ? filteredProdutos.map(p => {
+                      const stockBadge = getStockBadge(p.estoque);
+                      return (
+                        <tr key={p.id}>
+                          <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                          <td className="price-text">R$ {Number(p.preco).toFixed(2)}</td>
+                          <td>
+                            <span className={`badge-stock ${stockBadge.className}`}>
+                              {stockBadge.label}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions-cell">
+                              <button className="btn-icon" onClick={() => openEditProduto(p)}>
+                                <Edit size={16} />
+                              </button>
+                              <button className="btn-icon danger" onClick={() => deleteProduto(p.id)}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                        {searchProdutos ? `Nenhum produto encontrado para "${searchProdutos}".` : 'Nenhum produto cadastrado.'}
+                      </td></tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Preço</th>
-                  <th>Estoque</th>
-                  <th style={{ textAlign: 'right' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {produtos.length > 0 ? produtos.map(p => (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 500 }}>{p.nome}</td>
-                    <td style={{ color: '#2dd4bf', fontWeight: 600 }}>R$ {Number(p.preco).toFixed(2)}</td>
-                    <td>
-                      <span style={{ background: p.estoque > 0 ? 'rgba(20, 184, 166, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: p.estoque > 0 ? '#2dd4bf' : '#f87171', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
-                        {p.estoque} un
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button className="btn-icon" onClick={() => openEditProduto(p)}>
-                          <Edit size={16} />
-                        </button>
-                        <button className="btn-icon danger" onClick={() => deleteProduto(p.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhum produto cadastrado.</td></tr>
-                )}
-              </tbody>
-            </table>
           </div>
         )}
 
         {view === 'categorias' && (
-          <div className="content-panel">
-            <div className="panel-header">
-              <h2 style={{ fontSize: '18px', margin: 0, fontWeight: 600 }}>Estrutura de Categorias</h2>
-              <button className="btn-gradient" onClick={openAddCategoria}>
-                <Plus size={16} /> Nova Categoria
-              </button>
+          <div className="view-transition">
+            <div className="content-panel">
+              <div className="panel-header">
+                <h2>Estrutura de Categorias</h2>
+                <button className="btn-gradient" onClick={openAddCategoria}>
+                  <Plus size={16} /> Nova Categoria
+                </button>
+              </div>
+              {loading ? (
+                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={3} /></div>
+              ) : (
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nome (Hierarquia)</th>
+                      <th style={{ textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categorias.length > 0 ? categorias.map(c => {
+                      const parent = categorias.find(p => p.id === c.parent_id);
+                      return (
+                      <tr key={c.id}>
+                        <td style={{ color: 'var(--text-muted)' }}>#{c.id}</td>
+                        <td>
+                          <span className="badge-cat">
+                            {parent ? `${parent.nome} > ${c.nome}` : c.nome}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="actions-cell">
+                            <button className="btn-icon" onClick={() => openEditCategoria(c)}>
+                              <Edit size={16} />
+                            </button>
+                            <button className="btn-icon danger" onClick={() => deleteCategoria(c.id)}>
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}) : (
+                      <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma categoria cadastrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nome (Hierarquia)</th>
-                  <th style={{ textAlign: 'right' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categorias.length > 0 ? categorias.map(c => {
-                  const parent = categorias.find(p => p.id === c.parent_id);
-                  return (
-                  <tr key={c.id}>
-                    <td style={{ color: '#94a3b8' }}>#{c.id}</td>
-                    <td>
-                      <span className="badge-cat">
-                        {parent ? `${parent.nome} > ${c.nome}` : c.nome}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button className="btn-icon" onClick={() => openEditCategoria(c)}>
-                          <Edit size={16} />
-                        </button>
-                        <button className="btn-icon danger" onClick={() => deleteCategoria(c.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )}) : (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Nenhuma categoria cadastrada.</td></tr>
-                )}
-              </tbody>
-            </table>
           </div>
         )}
 
@@ -703,15 +519,15 @@ export default function SystemDashboard() {
 
       {/* Categoria Modal */}
       {categoriaModalOpen && (
-        <div className="glass-modal">
-          <div className="modal-content-glass">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>{selectedCategoria ? 'Editar Categoria' : 'Nova Categoria'}</h3>
-              <button onClick={() => setCategoriaModalOpen(false)} className="btn-icon" style={{ border: 'none' }}><X size={20} /></button>
+        <div className="glass-modal" onClick={() => setCategoriaModalOpen(false)}>
+          <div className="modal-content-glass" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{selectedCategoria ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+              <button onClick={() => setCategoriaModalOpen(false)} className="modal-close"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveCategoria}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Nome da Categoria</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Nome da Categoria</label>
                 <input 
                   type="text" className="input-glass" 
                   placeholder="Ex: Hardware"
@@ -719,7 +535,7 @@ export default function SystemDashboard() {
                 />
               </div>
               <div style={{ marginBottom: '32px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Categoria Pai (Opcional)</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Categoria Pai (Opcional)</label>
                 <select className="input-glass" style={{ appearance: 'none' }} value={categoriaParentId} onChange={(e) => setCategoriaParentId(e.target.value)}>
                   <option value="">Nenhuma (Categoria Principal)</option>
                   {categorias.filter(c => c.id !== selectedCategoria?.id).map(c => (
@@ -737,35 +553,35 @@ export default function SystemDashboard() {
 
       {/* Produto Modal */}
       {produtoModalOpen && (
-        <div className="glass-modal">
-          <div className="modal-content-glass" style={{ width: '600px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>{selectedProduto ? 'Editar Produto' : 'Novo Produto'}</h3>
-              <button onClick={() => setProdutoModalOpen(false)} className="btn-icon" style={{ border: 'none' }}><X size={20} /></button>
+        <div className="glass-modal" onClick={() => setProdutoModalOpen(false)}>
+          <div className="modal-content-glass" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{selectedProduto ? 'Editar Produto' : 'Novo Produto'}</h3>
+              <button onClick={() => setProdutoModalOpen(false)} className="modal-close"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveProduto}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Nome do Produto</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Nome do Produto</label>
                 <input type="text" className="input-glass" placeholder="Ex: RTX 4090" value={produtoNome} onChange={(e) => setProdutoNome(e.target.value)} required />
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Descrição</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Descrição</label>
                 <input type="text" className="input-glass" placeholder="Breve descrição" value={produtoDescricao} onChange={(e) => setProdutoDescricao(e.target.value)} />
               </div>
               
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Preço (R$)</label>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Preço (R$)</label>
                   <input type="number" step="0.01" className="input-glass" value={produtoPreco} onChange={(e) => setProdutoPreco(e.target.value)} required />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Estoque</label>
+                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Estoque</label>
                   <input type="number" className="input-glass" value={produtoEstoque} onChange={(e) => setProdutoEstoque(e.target.value)} required />
                 </div>
               </div>
 
               <div style={{ marginBottom: '32px' }}>
-                <label style={{ display: 'block', fontSize: '13px', color: '#94a3b8' }}>Categoria</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>Categoria</label>
                 <select className="input-glass" style={{ appearance: 'none' }} value={produtoCategoriaId} onChange={(e) => setProdutoCategoriaId(e.target.value)} required>
                   <option value="" disabled>Selecione...</option>
                   {categorias.map(c => {

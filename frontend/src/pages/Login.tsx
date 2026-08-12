@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingBag, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,31 @@ export default function Login() {
   const [authEmail, setAuthEmail] = useState('');
   const [authSenha, setAuthSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [shakeError, setShakeError] = useState(false);
   const [alerts, setAlerts] = useState<{id: number, type: string, message: string}[]>([]);
+
+  // Password strength
+  const passwordStrength = useMemo(() => {
+    if (!authSenha || authState === 'login') return '';
+    let score = 0;
+    if (authSenha.length >= 6) score++;
+    if (authSenha.length >= 10) score++;
+    if (/[A-Z]/.test(authSenha)) score++;
+    if (/[0-9]/.test(authSenha)) score++;
+    if (/[^A-Za-z0-9]/.test(authSenha)) score++;
+    if (score <= 1) return 'weak';
+    if (score <= 2) return 'fair';
+    if (score <= 3) return 'good';
+    return 'strong';
+  }, [authSenha, authState]);
+
+  const strengthLabels: Record<string, string> = {
+    weak: 'Fraca',
+    fair: 'Razoável',
+    good: 'Boa',
+    strong: 'Forte',
+  };
 
   const addAlert = (type: string, message: string) => {
     const id = Date.now();
@@ -30,6 +54,11 @@ export default function Login() {
     }, 4000);
   };
 
+  const triggerShake = () => {
+    setShakeError(true);
+    setTimeout(() => setShakeError(false), 500);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authEmail || !authSenha) {
@@ -37,6 +66,7 @@ export default function Login() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const res = await api.post('/usuarios/login', {
         email: authEmail,
@@ -55,6 +85,7 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error(err);
+      triggerShake();
       if (err.response && err.response.data) {
         if (err.response.data.erros) {
           addAlert('danger', 'Erro de validação: Verifique o formato do email e a senha.');
@@ -64,6 +95,8 @@ export default function Login() {
       } else {
         addAlert('danger', 'Erro de comunicação com a API backend.');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -74,6 +107,7 @@ export default function Login() {
       return;
     }
 
+    setIsLoading(true);
     try {
       await api.post('/usuarios/cadastrar', {
         nome: authNome,
@@ -87,6 +121,7 @@ export default function Login() {
       
     } catch (err: any) {
       console.error(err);
+      triggerShake();
       if (err.response && err.response.data) {
         if (err.response.data.erros) {
             const mensagens = err.response.data.erros.map((e: any) => e.message).join(', ');
@@ -97,11 +132,40 @@ export default function Login() {
       } else {
         addAlert('danger', 'Erro de conexão com o servidor.');
       }
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const switchAuthState = () => {
+    setAuthState(authState === 'login' ? 'register' : 'login');
+    setAuthSenha('');
   };
 
   return (
     <div className="auth-container">
+      {/* Floating particles */}
+      <div className="auth-particles">
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="auth-particle"
+            style={{
+              width: `${8 + Math.random() * 16}px`,
+              height: `${8 + Math.random() * 16}px`,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              '--duration': `${5 + Math.random() * 8}s`,
+              '--delay': `${Math.random() * 3}s`,
+              background: i % 2 === 0 
+                ? 'rgba(139, 92, 246, 0.15)' 
+                : 'rgba(6, 182, 212, 0.12)',
+            } as React.CSSProperties}
+          />
+        ))}
+      </div>
+
+      {/* Toast alerts */}
       <div className="alert-container">
         {alerts.map(alert => (
           <div key={alert.id} className={`alert-toast ${alert.type}`}>
@@ -114,9 +178,9 @@ export default function Login() {
         ))}
       </div>
 
-      <div className="auth-card animate-fade-in">
+      <div className={`auth-card animate-fade-in ${shakeError ? 'shake-error' : ''}`}>
         <div className="auth-header">
-          <div className="auth-logo">
+          <div className="auth-logo animate-float">
             <ShoppingBag size={32} />
           </div>
           <h1 className="auth-title">Kamikase ERP & PDV</h1>
@@ -127,7 +191,7 @@ export default function Login() {
 
         <form onSubmit={authState === 'login' ? handleLogin : handleRegister}>
           {authState === 'register' && (
-            <div className="form-group">
+            <div className="form-group animate-fade-in">
               <label className="form-label">Nome Completo</label>
               <div className="input-wrapper">
                 <User className="input-icon" size={18} />
@@ -178,19 +242,35 @@ export default function Login() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {authState === 'register' && authSenha && (
+              <div style={{ marginTop: '8px' }}>
+                <div className="password-strength">
+                  <div className={`password-strength-bar ${passwordStrength}`} />
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
+                  Força: {strengthLabels[passwordStrength] || ''}
+                </span>
+              </div>
+            )}
           </div>
 
-          <button type="submit" className="btn btn-primary">
-            {authState === 'login' ? 'Entrar no Sistema' : 'Criar Conta'}
+          <button type="submit" className={`btn btn-primary ${isLoading ? 'btn-loading' : ''}`} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <div className="btn-spinner" />
+                Processando...
+              </>
+            ) : (
+              authState === 'login' ? 'Entrar no Sistema' : 'Criar Conta'
+            )}
           </button>
 
           <div className="auth-switch-text">
-            {authState === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'} {' '}
+            {authState === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'}{' '}
             <button 
               type="button" 
               className="auth-switch-btn"
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold' }}
-              onClick={() => setAuthState(authState === 'login' ? 'register' : 'login')}
+              onClick={switchAuthState}
             >
               {authState === 'login' ? 'Cadastre-se' : 'Faça login'}
             </button>

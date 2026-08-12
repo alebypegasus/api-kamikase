@@ -1,14 +1,22 @@
-import { useState, useEffect } from 'react';
-import { Users, Package, ShoppingBag, LogOut, ShieldAlert } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Users, Package, ShoppingBag, LogOut, ShieldAlert, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import AnimatedCounter from '../components/AnimatedCounter';
+import Skeleton from '../components/Skeleton';
+
+type SortField = 'nome' | 'total_produtos' | 'valor_total_estoque' | 'total_vendas' | 'valor_total_vendido';
+type SortDir = 'asc' | 'desc';
 
 export default function AdminDashboard() {
   const { userName, logout } = useAuth();
   const navigate = useNavigate();
 
   const [dashboardData, setDashboardData] = useState<any>({ usuarios: [], global: null });
+  const [loading, setLoading] = useState(true);
+  const [sortField, setSortField] = useState<SortField>('valor_total_vendido');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
     fetchAdminData();
@@ -17,11 +25,14 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchAdminData = async () => {
+    setLoading(true);
     try {
       const res = await api.get('/admin/dashboard');
       setDashboardData(res.data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -30,194 +41,60 @@ export default function AdminDashboard() {
     navigate('/');
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
+
+  const getSortClass = (field: SortField) => {
+    if (sortField !== field) return 'sortable';
+    return sortDir === 'asc' ? 'sortable sorted-asc' : 'sortable sorted-desc';
+  };
+
+  const sortedUsuarios = useMemo(() => {
+    if (!dashboardData.usuarios) return [];
+    return [...dashboardData.usuarios].sort((a: any, b: any) => {
+      const aVal = sortField === 'nome' ? a[sortField] : Number(a[sortField]);
+      const bVal = sortField === 'nome' ? b[sortField] : Number(b[sortField]);
+      if (sortField === 'nome') {
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+  }, [dashboardData.usuarios, sortField, sortDir]);
+
   const globalTotalUsers = dashboardData.usuarios?.length || 0;
   const globalTotalProdutos = Number(dashboardData.global?.produtos?.total || 0);
   const globalValorVendido = Number(dashboardData.global?.vendas?.valor || 0);
   const globalEstoqueValor = Number(dashboardData.global?.produtos?.valor || 0);
   const globalCategorias = Number(dashboardData.global?.categorias?.total || 0);
 
+  // Top seller badge
+  const topSeller = sortedUsuarios.length > 0 
+    ? sortedUsuarios.reduce((top: any, u: any) => Number(u.valor_total_vendido) > Number(top.valor_total_vendido) ? u : top, sortedUsuarios[0])
+    : null;
+
   return (
-    <div className="admin-container">
-      <style>{`
-        .dark-admin {
-          background: #0b0f19;
-          color: #e2e8f0;
-          font-family: 'Inter', system-ui, sans-serif;
-          margin: 0;
-          padding: 0;
-          min-height: 100vh;
-        }
-        .admin-container {
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.1), transparent 40%),
-                      radial-gradient(circle at 0% 100%, rgba(20, 184, 166, 0.05), transparent 40%);
-        }
-        .admin-header {
-          background: rgba(15, 23, 42, 0.7);
-          backdrop-filter: blur(12px);
-          padding: 16px 32px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          position: sticky;
-          top: 0;
-          z-index: 50;
-        }
-        .admin-logo-box {
-          width: 44px;
-          height: 44px;
-          background: linear-gradient(135deg, #f59e0b, #ef4444);
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-        }
-        .admin-title {
-          margin: 0;
-          font-size: 22px;
-          font-weight: 800;
-          background: linear-gradient(to right, #fcd34d, #f87171);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .btn-outline {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #e2e8f0;
-          border-radius: 8px;
-          padding: 8px 16px;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-outline:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .btn-icon-admin {
-          background: transparent;
-          border: 1px solid transparent;
-          color: #94a3b8;
-          padding: 8px;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-icon-admin:hover {
-          background: rgba(239, 68, 68, 0.1);
-          color: #f87171;
-        }
-        .stat-grid-admin {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-          gap: 24px;
-          margin-bottom: 40px;
-        }
-        .stat-card-admin {
-          background: rgba(30, 41, 59, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
-          padding: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: relative;
-          overflow: hidden;
-        }
-        .stat-card-admin::after {
-          content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
-        }
-        .stat-card-admin.users::after { background: #3b82f6; }
-        .stat-card-admin.products::after { background: #8b5cf6; }
-        .stat-card-admin.categories::after { background: #ec4899; }
-        .stat-card-admin.stock::after { background: #14b8a6; }
-        .stat-card-admin.revenue::after { background: #f59e0b; }
-        
-        .stat-icon-admin {
-          width: 50px; height: 50px;
-          border-radius: 12px;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .content-panel-admin {
-          background: rgba(30, 41, 59, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 16px;
-          padding: 24px;
-        }
-        .table-admin {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 16px;
-        }
-        .table-admin th {
-          text-align: left;
-          padding: 16px;
-          color: #94a3b8;
-          font-size: 13px;
-          font-weight: 500;
-          text-transform: uppercase;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .table-admin td {
-          padding: 16px;
-          border-bottom: 1px solid rgba(255,255,255,0.02);
-          font-size: 14px;
-        }
-        .table-admin tr:hover td {
-          background: rgba(255,255,255,0.02);
-        }
-        .highlight-text {
-          color: #fcd34d;
-          font-weight: 600;
-        }
-        .highlight-text-green {
-          color: #2dd4bf;
-          font-weight: 600;
-        }
-        @media (max-width: 768px) {
-          .admin-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 16px;
-            padding: 16px;
-          }
-          .admin-container > div {
-            padding: 16px !important;
-          }
-          .stat-grid-admin {
-            grid-template-columns: 1fr;
-          }
-          .table-admin {
-            display: block;
-            overflow-x: auto;
-            white-space: nowrap;
-          }
-          .content-panel-admin {
-            padding: 16px;
-          }
-        }
-      `}</style>
+    <div className="admin-container page-transition">
 
       {/* Header */}
       <header className="admin-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="admin-header-left">
           <div className="admin-logo-box">
             <ShieldAlert size={24} color="white" />
           </div>
-          <h1 className="admin-title">Kamikase ERP & PDV</h1>
+          <h1 className="admin-title neon-text-warm">Kamikase ERP & PDV</h1>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', color: '#f8fafc' }}>{userName}</div>
-              <div style={{ fontSize: '12px', color: '#f87171' }}>Super Administrador</div>
+        <div className="admin-header-right">
+          <div className="admin-user-info">
+            <div className="admin-user-details">
+              <div className="admin-user-name">{userName}</div>
+              <div className="admin-user-role">Super Administrador</div>
             </div>
             <button onClick={handleLogout} className="btn-icon-admin" title="Sair">
               <LogOut size={20} />
@@ -227,96 +104,125 @@ export default function AdminDashboard() {
       </header>
 
       {/* Main Layout */}
-      <div style={{ flexGrow: 1, padding: '40px', overflowY: 'auto' }}>
+      <div className="admin-main">
         
-        <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px 0' }}>Visão Global da Plataforma</h2>
-        <p style={{ color: '#94a3b8', margin: '0 0 32px 0' }}>Métricas consolidadas de todos os lojistas ativos no sistema.</p>
+        <h2>Visão Global da Plataforma</h2>
+        <p>Métricas consolidadas de todos os lojistas ativos no sistema.</p>
 
-        <div className="stat-grid-admin">
-          <div className="stat-card-admin users">
-            <div>
-              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Lojistas Cadastrados</div>
-              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalTotalUsers}</div>
-            </div>
-            <div className="stat-icon-admin" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa' }}><Users size={24} /></div>
+        {loading ? (
+          <div className="stat-grid-admin">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} variant="stat" />
+            ))}
           </div>
-          
-          <div className="stat-card-admin products">
-            <div>
-              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Total de Produtos</div>
-              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalTotalProdutos}</div>
+        ) : (
+          <div className="stat-grid-admin">
+            <div className="stat-card-admin users animate-fade-in animate-stagger-1">
+              <div>
+                <div className="stat-card-admin-label">Lojistas Cadastrados</div>
+                <div className="stat-card-admin-value"><AnimatedCounter value={globalTotalUsers} /></div>
+              </div>
+              <div className="stat-icon-admin" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa' }}><Users size={24} /></div>
             </div>
-            <div className="stat-icon-admin" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa' }}><Package size={24} /></div>
-          </div>
+            
+            <div className="stat-card-admin products animate-fade-in animate-stagger-2">
+              <div>
+                <div className="stat-card-admin-label">Total de Produtos</div>
+                <div className="stat-card-admin-value"><AnimatedCounter value={globalTotalProdutos} /></div>
+              </div>
+              <div className="stat-icon-admin" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#a78bfa' }}><Package size={24} /></div>
+            </div>
 
-          <div className="stat-card-admin categories">
-            <div>
-              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Total de Categorias</div>
-              <div style={{ fontSize: '28px', fontWeight: 700 }}>{globalCategorias}</div>
+            <div className="stat-card-admin categories animate-fade-in animate-stagger-3">
+              <div>
+                <div className="stat-card-admin-label">Total de Categorias</div>
+                <div className="stat-card-admin-value"><AnimatedCounter value={globalCategorias} /></div>
+              </div>
+              <div className="stat-icon-admin" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6' }}><Package size={24} /></div>
             </div>
-            <div className="stat-icon-admin" style={{ background: 'rgba(236, 72, 153, 0.1)', color: '#f472b6' }}><Package size={24} /></div>
-          </div>
-          
-          <div className="stat-card-admin stock">
-            <div>
-              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Patrimônio em Estoque</div>
-              <div style={{ fontSize: '28px', fontWeight: 700, color: '#2dd4bf' }}>R$ {globalEstoqueValor.toFixed(2)}</div>
+            
+            <div className="stat-card-admin stock animate-fade-in animate-stagger-4">
+              <div>
+                <div className="stat-card-admin-label">Patrimônio em Estoque</div>
+                <div className="stat-card-admin-value text-accent">
+                  <AnimatedCounter value={globalEstoqueValor} prefix="R$ " decimals={2} />
+                </div>
+              </div>
+              <div className="stat-icon-admin" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#2dd4bf' }}><Package size={24} /></div>
             </div>
-            <div className="stat-icon-admin" style={{ background: 'rgba(20, 184, 166, 0.1)', color: '#2dd4bf' }}><Package size={24} /></div>
-          </div>
-          
-          <div className="stat-card-admin revenue">
-            <div>
-              <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>Faturamento Global</div>
-              <div style={{ fontSize: '28px', fontWeight: 700, color: '#fcd34d' }}>R$ {globalValorVendido.toFixed(2)}</div>
+            
+            <div className="stat-card-admin revenue animate-fade-in animate-stagger-5">
+              <div>
+                <div className="stat-card-admin-label">Faturamento Global</div>
+                <div className="stat-card-admin-value" style={{ color: '#fcd34d' }}>
+                  <AnimatedCounter value={globalValorVendido} prefix="R$ " decimals={2} />
+                </div>
+              </div>
+              <div className="stat-icon-admin" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24' }}><ShoppingBag size={24} /></div>
             </div>
-            <div className="stat-icon-admin" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24' }}><ShoppingBag size={24} /></div>
           </div>
-        </div>
+        )}
 
-        <div className="content-panel-admin">
-          <h3 style={{ fontSize: '18px', margin: '0 0 16px 0', fontWeight: 600 }}>Desempenho por Usuário (Lojistas)</h3>
+        <div className="content-panel-admin animate-fade-in">
+          <div className="panel-admin-controls">
+            <h3>Desempenho por Usuário (Lojistas)</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)', fontSize: '13px' }}>
+              <ArrowUpDown size={14} />
+              <span>Clique nos cabeçalhos para ordenar</span>
+            </div>
+          </div>
           
           <div style={{ overflowX: 'auto' }}>
-            <table className="table-admin">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Lojista</th>
-                  <th>E-mail</th>
-                  <th>Produtos</th>
-                  <th>Valor em Estoque</th>
-                  <th>Qtd. Vendas</th>
-                  <th>Faturamento Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboardData.usuarios?.length > 0 ? dashboardData.usuarios.map((d: any) => (
-                  <tr key={d.usuario_id}>
-                    <td style={{ color: '#64748b' }}>#{d.usuario_id}</td>
-                    <td style={{ fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '28px', height: '28px', background: 'rgba(255,255,255,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
-                          {d.nome.charAt(0)}
-                        </div>
-                        {d.nome}
-                      </div>
-                    </td>
-                    <td style={{ color: '#94a3b8' }}>{d.email}</td>
-                    <td>{d.total_produtos} unid.</td>
-                    <td className="highlight-text-green">R$ {Number(d.valor_total_estoque).toFixed(2)}</td>
-                    <td>{d.total_vendas} oper.</td>
-                    <td className="highlight-text">R$ {Number(d.valor_total_vendido).toFixed(2)}</td>
-                  </tr>
-                )) : (
+            {loading ? (
+              <div style={{ padding: '16px' }}>
+                <Skeleton variant="row" count={5} />
+              </div>
+            ) : (
+              <table className="table-admin">
+                <thead>
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Nenhum dado de lojista processado.
-                    </td>
+                    <th>ID</th>
+                    <th className={getSortClass('nome')} onClick={() => handleSort('nome')}>Lojista</th>
+                    <th>E-mail</th>
+                    <th className={getSortClass('total_produtos')} onClick={() => handleSort('total_produtos')}>Produtos</th>
+                    <th className={getSortClass('valor_total_estoque')} onClick={() => handleSort('valor_total_estoque')}>Valor em Estoque</th>
+                    <th className={getSortClass('total_vendas')} onClick={() => handleSort('total_vendas')}>Qtd. Vendas</th>
+                    <th className={getSortClass('valor_total_vendido')} onClick={() => handleSort('valor_total_vendido')}>Faturamento Total</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedUsuarios.length > 0 ? sortedUsuarios.map((d: any) => (
+                    <tr key={d.usuario_id}>
+                      <td style={{ color: 'var(--text-dim)' }}>#{d.usuario_id}</td>
+                      <td>
+                        <div className="table-admin-user-cell">
+                          <div className="table-admin-avatar">
+                            {d.nome.charAt(0)}
+                          </div>
+                          {d.nome}
+                          {topSeller && d.usuario_id === topSeller.usuario_id && Number(d.valor_total_vendido) > 0 && (
+                            <span className="badge-performance top" title="Maior faturamento">
+                              🔥 Top
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>{d.email}</td>
+                      <td>{d.total_produtos} unid.</td>
+                      <td className="highlight-text-green">R$ {Number(d.valor_total_estoque).toFixed(2)}</td>
+                      <td>{d.total_vendas} oper.</td>
+                      <td className="highlight-text">R$ {Number(d.valor_total_vendido).toFixed(2)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                        Nenhum dado de lojista processado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 

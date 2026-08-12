@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './components/Toast';
+import { ConfirmProvider } from './components/ConfirmDialog';
 
 // Pages
 import Login from './pages/Login';
@@ -19,14 +21,18 @@ const ProtectedRoute = ({ children, requireAdmin, forbidAdmin }: { children: Rea
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/pdv" element={<ProtectedRoute forbidAdmin={true}><PDV /></ProtectedRoute>} />
-          <Route path="/system" element={<ProtectedRoute forbidAdmin={true}><SystemDashboard /></ProtectedRoute>} />
-          <Route path="/adm" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/pdv" element={<ProtectedRoute forbidAdmin={true}><PDV /></ProtectedRoute>} />
+              <Route path="/system" element={<ProtectedRoute forbidAdmin={true}><SystemDashboard /></ProtectedRoute>} />
+              <Route path="/adm" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
+            </Routes>
+          </BrowserRouter>
+        </ConfirmProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

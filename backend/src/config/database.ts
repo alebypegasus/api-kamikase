@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const db = mysql.createPool ({
+export const db = mysql.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT), 
     user: process.env.DB_USER,
@@ -14,8 +14,13 @@ export const db = mysql.createPool ({
     queueLimit: 0
 });
 
-
-
-db.getConnection();
-
-console.log('Canal de comunicação com MySQL preparado (Pool de conexões)')
+// Verify database connectivity on startup
+(async () => {
+    try {
+        const connection = await db.getConnection();
+        console.log('✅ Conexão com MySQL estabelecida com sucesso (Pool de conexões)');
+        connection.release();
+    } catch (error) {
+        console.error('❌ Falha ao conectar com o MySQL:', (error as Error).message);
+    }
+})();

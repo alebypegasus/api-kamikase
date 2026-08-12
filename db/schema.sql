@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
     email VARCHAR(255) NOT NULL UNIQUE,
     senha VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_usuarios_email (email),
+    INDEX idx_usuarios_is_admin (is_admin)
 );
 
 CREATE TABLE IF NOT EXISTS categorias (
@@ -16,8 +19,11 @@ CREATE TABLE IF NOT EXISTS categorias (
     usuarios_id INT NOT NULL,
     parent_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_id) REFERENCES categorias(id) ON DELETE CASCADE
+    FOREIGN KEY (parent_id) REFERENCES categorias(id) ON DELETE CASCADE,
+    INDEX idx_categorias_usuario (usuarios_id),
+    INDEX idx_categorias_parent (parent_id)
 );
 
 CREATE TABLE IF NOT EXISTS produtos (
@@ -29,8 +35,12 @@ CREATE TABLE IF NOT EXISTS produtos (
     categorias_id INT NOT NULL,
     usuarios_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (categorias_id) REFERENCES categorias(id) ON DELETE CASCADE,
-    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_produtos_usuario (usuarios_id),
+    INDEX idx_produtos_categoria (categorias_id),
+    INDEX idx_produtos_nome (nome)
 );
 
 CREATE TABLE IF NOT EXISTS vendas (
@@ -41,7 +51,9 @@ CREATE TABLE IF NOT EXISTS vendas (
     forma_pagamento VARCHAR(50),
     parcelas INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    FOREIGN KEY (usuarios_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    INDEX idx_vendas_usuario (usuarios_id),
+    INDEX idx_vendas_created (created_at)
 );
 
 CREATE TABLE IF NOT EXISTS itens_venda (
@@ -51,5 +63,7 @@ CREATE TABLE IF NOT EXISTS itens_venda (
     quantidade INT NOT NULL,
     preco_unitario DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (vendas_id) REFERENCES vendas(id) ON DELETE CASCADE,
-    FOREIGN KEY (produtos_id) REFERENCES produtos(id) ON DELETE CASCADE
+    FOREIGN KEY (produtos_id) REFERENCES produtos(id) ON DELETE CASCADE,
+    INDEX idx_itens_venda (vendas_id),
+    INDEX idx_itens_produto (produtos_id)
 );
