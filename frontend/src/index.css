@@ -813,6 +813,7 @@ body {
   font-weight: 700;
   background: linear-gradient(to right, #ffffff, #a78bfa);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 8px;
 }
@@ -2564,4 +2565,55 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ============================================
+   PRINT STYLES (CUPOM DE VENDA PDV)
+   ============================================ */
+@media print {
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Esconde tudo exceto o cupom */
+  .pdv-header,
+  .pdv-catalog,
+  .pdv-cart-sidebar,
+  .pdv-notification,
+  .glass-modal .modal-header,
+  .glass-modal button,
+  .sys-container aside,
+  .page-header {
+    display: none !important;
+  }
+
+  .glass-modal {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .modal-content-glass {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .receipt-paper {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 10px !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    font-size: 11px !important;
+  }
 }

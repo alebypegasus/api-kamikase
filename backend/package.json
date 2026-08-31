@@ -1,26 +1,41 @@
 {
   "name": "api-kamikase",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Kamikase ERP & PDV — Sistema de gestão de vendas, produtos e categorias",
+  "main": "src/server.ts",
   "scripts": {
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "db:init": "tsx src/scripts/init_db.ts",
+    "db:migrate": "tsx src/scripts/migrate.ts && tsx src/scripts/migrate_v2.ts",
+    "db:seed": "tsx src/scripts/seed.ts"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "erp",
+    "pdv",
+    "vendas",
+    "gestao"
+  ],
+  "author": "Kamikase Team",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "compression": "^1.8.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.9.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.22.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

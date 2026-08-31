@@ -2,6 +2,9 @@ import { db } from '../config/database';
 import { IUsuario } from '../types';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
+// Whitelist de campos permitidos para atualização (previne SQL injection via nomes de coluna)
+const ALLOWED_UPDATE_FIELDS = ['nome', 'email', 'senha'] as const;
+
 export class UsuarioModel {
     static async buscarPorEmail(email: string): Promise<IUsuario | null> {
         const [linhas] = await db.execute<RowDataPacket[]>(
@@ -16,7 +19,7 @@ export class UsuarioModel {
 
     static async listarTodos(): Promise<IUsuario[]> {
         const [linhas] = await db.execute<RowDataPacket[]>(
-            'SELECT id, nome, email, is_admin FROM usuarios'
+            'SELECT id, nome, email, is_admin, created_at FROM usuarios'
         );
         return linhas as IUsuario[];
     }
@@ -38,11 +41,14 @@ export class UsuarioModel {
     }
 
     static async atualizar(id: number, dados: Partial<IUsuario>): Promise<boolean> {
-        const campos = Object.keys(dados);
+        // Filtrar apenas campos permitidos
+        const campos = Object.keys(dados).filter(
+            campo => ALLOWED_UPDATE_FIELDS.includes(campo as typeof ALLOWED_UPDATE_FIELDS[number])
+        );
         if (campos.length === 0) return false;
 
         const setSql = campos.map(campo => `${campo} = ?`).join(', ');
-        const valores = campos.map(campo => (dados as any)[campo]);
+        const valores: any[] = campos.map(campo => (dados as Record<string, unknown>)[campo]);
         valores.push(id);
 
         const [resultado] = await db.execute<ResultSetHeader>(

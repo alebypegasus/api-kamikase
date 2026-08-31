@@ -1,154 +1,133 @@
 import { Response } from 'express';
+import { z } from 'zod';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { ProdutoModel } from '../models/ProdutoModel';
 
+const criarProdutoSchema = z.object({
+    nome: z.string().min(1, "Nome do produto é obrigatório").max(255),
+    descricao: z.string().max(1000).optional().nullable(),
+    preco: z.number({ message: "Preço é obrigatório" }).positive("Preço deve ser positivo"),
+    categorias_id: z.number({ message: "Categoria é obrigatória" }).int().positive(),
+    estoque: z.number().int().min(0, "Estoque não pode ser negativo").optional().default(0),
+});
+
+const atualizarProdutoSchema = z.object({
+    nome: z.string().min(1).max(255).optional(),
+    descricao: z.string().max(1000).optional().nullable(),
+    preco: z.number().positive("Preço deve ser positivo").optional(),
+    categorias_id: z.number().int().positive().optional(),
+    estoque: z.number().int().min(0, "Estoque não pode ser negativo").optional(),
+});
+
 export class ProdutoController {
     static async criar(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const { nome, descricao, preco, categorias_id, estoque } = req.body;
-            const usuarios_id = req.usuarioId;
+        const dados = criarProdutoSchema.parse(req.body);
+        const usuarios_id = req.usuarioId;
 
-            if (!nome || preco === undefined || !categorias_id || !usuarios_id) {
-                return res.status(400).json({ erro: 'Todos os campos (nome, preco, categorias_id) são obrigatórios.' });
-            }
-
-            const id = await ProdutoModel.criar({
-                nome,
-                descricao,
-                preco,
-                categorias_id: Number(categorias_id),
-                usuarios_id,
-                estoque: estoque !== undefined ? Number(estoque) : 0
-            });
-
-            return res.status(201).json({ mensagem: 'Produto criado com sucesso.', id });
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro interno do servidor.' });
+        if (!usuarios_id) {
+            return res.status(401).json({ erro: 'Usuário não autenticado.' });
         }
+
+        const id = await ProdutoModel.criar({
+            nome: dados.nome,
+            descricao: dados.descricao ?? undefined,
+            preco: dados.preco,
+            categorias_id: dados.categorias_id,
+            usuarios_id,
+            estoque: dados.estoque ?? 0
+        });
+
+        return res.status(201).json({ mensagem: 'Produto criado com sucesso.', id });
     }
 
     static async listarTodos(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const produtos = await ProdutoModel.listarTodos();
-            return res.status(200).json(produtos);
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao listar todos os produtos.' });
-        }
+        const produtos = await ProdutoModel.listarTodos();
+        return res.status(200).json(produtos);
     }
 
     static async listarPorUsuario(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const usuarios_id = req.usuarioId;
-            if (!usuarios_id) {
-                return res.status(401).json({ erro: 'Usuário não autenticado.' });
-            }
-
-            const produtos = await ProdutoModel.listarPorUsuario(usuarios_id);
-            return res.status(200).json(produtos);
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao listar produtos.' });
+        const usuarios_id = req.usuarioId;
+        if (!usuarios_id) {
+            return res.status(401).json({ erro: 'Usuário não autenticado.' });
         }
+
+        const produtos = await ProdutoModel.listarPorUsuario(usuarios_id);
+        return res.status(200).json(produtos);
     }
 
     static async contarPorUsuario(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const usuarios_id = req.usuarioId;
-            if (!usuarios_id) {
-                return res.status(401).json({ erro: 'Usuário não autenticado.' });
-            }
-
-            const total = await ProdutoModel.contarPorUsuario(usuarios_id);
-            return res.status(200).json({ total });
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao contar produtos.' });
+        const usuarios_id = req.usuarioId;
+        if (!usuarios_id) {
+            return res.status(401).json({ erro: 'Usuário não autenticado.' });
         }
+
+        const total = await ProdutoModel.contarPorUsuario(usuarios_id);
+        return res.status(200).json({ total });
     }
 
     static async listarCategoriasPorUsuario(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const usuarios_id = req.usuarioId;
-            if (!usuarios_id) {
-                return res.status(401).json({ erro: 'Usuário não autenticado.' });
-            }
-
-            const categorias = await ProdutoModel.listarCategoriasPorUsuario(usuarios_id);
-            return res.status(200).json(categorias);
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao listar categorias do usuário.' });
+        const usuarios_id = req.usuarioId;
+        if (!usuarios_id) {
+            return res.status(401).json({ erro: 'Usuário não autenticado.' });
         }
+
+        const categorias = await ProdutoModel.listarCategoriasPorUsuario(usuarios_id);
+        return res.status(200).json(categorias);
     }
 
     static async contarCategoriasPorUsuario(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const usuarios_id = req.usuarioId;
-            if (!usuarios_id) {
-                return res.status(401).json({ erro: 'Usuário não autenticado.' });
-            }
-
-            const total = await ProdutoModel.contarCategoriasPorUsuario(usuarios_id);
-            return res.status(200).json({ total });
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao contar categorias do usuário.' });
+        const usuarios_id = req.usuarioId;
+        if (!usuarios_id) {
+            return res.status(401).json({ erro: 'Usuário não autenticado.' });
         }
+
+        const total = await ProdutoModel.contarCategoriasPorUsuario(usuarios_id);
+        return res.status(200).json({ total });
     }
 
     static async deletar(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const { id } = req.params;
-            const usuarios_id = req.usuarioId;
+        const { id } = req.params;
+        const usuarios_id = req.usuarioId;
 
-            if (!id || !usuarios_id) {
-                return res.status(400).json({ erro: 'ID do produto é obrigatório.' });
-            }
-
-            const deletado = await ProdutoModel.deletar(Number(id), usuarios_id);
-            if (!deletado) {
-                return res.status(404).json({ erro: 'Produto não encontrado ou não pertence a este usuário.' });
-            }
-
-            return res.status(200).json({ mensagem: 'Produto deletado com sucesso.' });
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao deletar produto.' });
+        if (!id || !usuarios_id) {
+            return res.status(400).json({ erro: 'ID do produto é obrigatório.' });
         }
+
+        const deletado = await ProdutoModel.deletar(Number(id), usuarios_id);
+        if (!deletado) {
+            return res.status(404).json({ erro: 'Produto não encontrado ou não pertence a este usuário.' });
+        }
+
+        return res.status(200).json({ mensagem: 'Produto deletado com sucesso.' });
     }
 
     static async atualizar(req: AuthRequest, res: Response): Promise<any> {
-        try {
-            const { id } = req.params;
-            const { nome, descricao, preco, categorias_id, estoque } = req.body;
-            const usuarios_id = req.usuarioId;
+        const { id } = req.params;
+        const usuarios_id = req.usuarioId;
 
-            if (!id || !usuarios_id) {
-                return res.status(400).json({ erro: 'ID do produto é obrigatório.' });
-            }
-
-            const dadosAtualizados: any = {};
-            if (nome) dadosAtualizados.nome = nome;
-            if (descricao !== undefined) dadosAtualizados.descricao = descricao;
-            if (preco !== undefined) dadosAtualizados.preco = preco;
-            if (categorias_id !== undefined) dadosAtualizados.categorias_id = Number(categorias_id);
-            if (estoque !== undefined) dadosAtualizados.estoque = Number(estoque);
-
-            if (Object.keys(dadosAtualizados).length === 0) {
-                return res.status(400).json({ erro: 'Nenhum campo fornecido para atualização.' });
-            }
-
-            const atualizado = await ProdutoModel.atualizar(Number(id), usuarios_id, dadosAtualizados);
-            if (!atualizado) {
-                return res.status(404).json({ erro: 'Produto não encontrado ou não pertence a este usuário.' });
-            }
-
-            return res.status(200).json({ mensagem: 'Produto atualizado com sucesso.' });
-        } catch (erro) {
-            console.error(erro);
-            return res.status(500).json({ erro: 'Erro ao atualizar produto.' });
+        if (!id || !usuarios_id) {
+            return res.status(400).json({ erro: 'ID do produto é obrigatório.' });
         }
+
+        const dados = atualizarProdutoSchema.parse(req.body);
+
+        // Filtrar apenas campos enviados
+        const dadosAtualizados: Record<string, unknown> = {};
+        if (dados.nome !== undefined) dadosAtualizados.nome = dados.nome;
+        if (dados.descricao !== undefined) dadosAtualizados.descricao = dados.descricao;
+        if (dados.preco !== undefined) dadosAtualizados.preco = dados.preco;
+        if (dados.categorias_id !== undefined) dadosAtualizados.categorias_id = dados.categorias_id;
+        if (dados.estoque !== undefined) dadosAtualizados.estoque = dados.estoque;
+
+        if (Object.keys(dadosAtualizados).length === 0) {
+            return res.status(400).json({ erro: 'Nenhum campo fornecido para atualização.' });
+        }
+
+        const atualizado = await ProdutoModel.atualizar(Number(id), usuarios_id, dadosAtualizados);
+        if (!atualizado) {
+            return res.status(404).json({ erro: 'Produto não encontrado ou não pertence a este usuário.' });
+        }
+
+        return res.status(200).json({ mensagem: 'Produto atualizado com sucesso.' });
     }
 }

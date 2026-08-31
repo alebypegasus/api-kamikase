@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign } from 'lucide-react';
+import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign, Eye, Download, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -22,6 +22,25 @@ interface Categoria {
   id: number;
   nome: string;
   parent_id?: number;
+}
+
+interface VendaDetalheItem {
+  id: number;
+  produtos_id: number;
+  produto_nome: string;
+  quantidade: number;
+  preco_unitario: number;
+}
+
+interface VendaDetalhe {
+  id: number;
+  usuarios_id: number;
+  valor_total: number;
+  desconto?: number;
+  forma_pagamento?: string;
+  parcelas?: number;
+  created_at: string;
+  itens?: VendaDetalheItem[];
 }
 
 export default function SystemDashboard() {
@@ -57,6 +76,11 @@ export default function SystemDashboard() {
   const [produtoPreco, setProdutoPreco] = useState('');
   const [produtoEstoque, setProdutoEstoque] = useState('0');
   const [produtoCategoriaId, setProdutoCategoriaId] = useState('');
+
+  // Venda details modal
+  const [vendaDetalheModalOpen, setVendaDetalheModalOpen] = useState(false);
+  const [vendaDetalhe, setVendaDetalhe] = useState<VendaDetalhe | null>(null);
+  const [loadingDetalhe, setLoadingDetalhe] = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -98,6 +122,74 @@ export default function SystemDashboard() {
       const res = await api.get('/vendas');
       setVendas(res.data);
     } catch (err) { console.error(err); }
+  };
+
+  const abrirDetalhesVenda = async (vendaId: number) => {
+    setLoadingDetalhe(true);
+    setVendaDetalheModalOpen(true);
+    try {
+      const res = await api.get(`/vendas/${vendaId}`);
+      setVendaDetalhe(res.data);
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Erro ao carregar detalhes da venda.');
+      setVendaDetalheModalOpen(false);
+    } finally {
+      setLoadingDetalhe(false);
+    }
+  };
+
+  const exportarVendasCSV = () => {
+    if (vendas.length === 0) {
+      addToast('warning', 'Não há vendas para exportar.');
+      return;
+    }
+
+    const headers = ['ID', 'Valor Total (R$)', 'Forma de Pagamento', 'Desconto (R$)', 'Data / Hora'];
+    const rows = vendas.map(v => [
+      v.id,
+      Number(v.valor_total).toFixed(2),
+      v.forma_pagamento || 'Não especificado',
+      Number(v.desconto || 0).toFixed(2),
+      new Date(v.created_at).toLocaleString('pt-BR')
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kamikase_vendas_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    addToast('success', 'Relatório de vendas exportado em CSV!');
+  };
+
+  const exportarProdutosCSV = () => {
+    if (produtos.length === 0) {
+      addToast('warning', 'Não há produtos para exportar.');
+      return;
+    }
+
+    const headers = ['ID', 'Nome', 'Preço (R$)', 'Estoque', 'Categoria ID', 'Descrição'];
+    const rows = produtos.map(p => [
+      p.id,
+      `"${p.nome.replace(/"/g, '""')}"`,
+      Number(p.preco).toFixed(2),
+      p.estoque,
+      p.categorias_id,
+      `"${(p.descricao || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kamikase_produtos_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    addToast('success', 'Catálogo de produtos exportado em CSV!');
   };
 
   const handleLogout = () => {
@@ -295,7 +387,7 @@ export default function SystemDashboard() {
               <div className="sidebar-user-name">{userName}</div>
               <div className="sidebar-user-role">{isAdmin ? 'Administrador' : 'Lojista'}</div>
             </div>
-            <button onClick={handleLogout} className="btn-icon danger" style={{ border: 'none', background: 'transparent' }}>
+            <button onClick={handleLogout} className="btn-icon danger" style={{ border: 'none', background: 'transparent' }} title="Sair">
               <LogOut size={18} />
             </button>
           </div>
@@ -310,7 +402,7 @@ export default function SystemDashboard() {
             {view === 'produtos' && 'Catálogo de Produtos'}
             {view === 'categorias' && 'Gestão de Categorias'}
           </h1>
-          <p>Gerencie seu inventário e acompanhe resultados.</p>
+          <p>Gerencie seu inventário e acompanhe resultados comerciais.</p>
         </div>
 
         {view === 'dashboard' && (
@@ -362,23 +454,35 @@ export default function SystemDashboard() {
             <div className="content-panel animate-fade-in">
               <div className="panel-header">
                 <h2>Últimas Transações</h2>
-                {totalVendasPages > 1 && (
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button className="btn-icon" disabled={vendasPage <= 1} onClick={() => setVendasPage(p => p - 1)}>←</button>
-                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{vendasPage}/{totalVendasPages}</span>
-                    <button className="btn-icon" disabled={vendasPage >= totalVendasPages} onClick={() => setVendasPage(p => p + 1)}>→</button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button 
+                    onClick={exportarVendasCSV} 
+                    className="btn-icon" 
+                    title="Exportar Vendas para CSV"
+                    style={{ padding: '8px 14px', gap: '6px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Download size={15} /> Exportar CSV
+                  </button>
+                  {totalVendasPages > 1 && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button className="btn-icon" disabled={vendasPage <= 1} onClick={() => setVendasPage(p => p - 1)}>←</button>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{vendasPage}/{totalVendasPages}</span>
+                      <button className="btn-icon" disabled={vendasPage >= totalVendasPages} onClick={() => setVendasPage(p => p + 1)}>→</button>
+                    </div>
+                  )}
+                </div>
               </div>
               {loading ? (
-                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={3} /></div>
+                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={4} /></div>
               ) : (
                 <table className="custom-table">
                   <thead>
                     <tr>
                       <th>ID</th>
                       <th>Valor Total</th>
+                      <th>Pagamento</th>
                       <th>Data</th>
+                      <th style={{ textAlign: 'right' }}>Detalhes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -386,10 +490,30 @@ export default function SystemDashboard() {
                       <tr key={v.id}>
                         <td style={{ color: 'var(--text-muted)' }}>#{v.id}</td>
                         <td className="price-text">R$ {Number(v.valor_total).toFixed(2)}</td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            padding: '3px 8px', 
+                            borderRadius: '6px', 
+                            background: 'rgba(255,255,255,0.06)',
+                            color: '#e2e8f0'
+                          }}>
+                            {v.forma_pagamento || 'Dinheiro'}
+                          </span>
+                        </td>
                         <td>{new Date(v.created_at).toLocaleString('pt-BR')}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button 
+                            className="btn-icon" 
+                            onClick={() => abrirDetalhesVenda(v.id)}
+                            title="Ver Itens da Venda"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma venda registrada.</td></tr>
+                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma venda registrada.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -411,9 +535,19 @@ export default function SystemDashboard() {
                     className="animate-fade-in"
                   />
                 </div>
-                <button className="btn-gradient" onClick={openAddProduto}>
-                  <Plus size={16} /> Novo Produto
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={exportarProdutosCSV} 
+                    className="btn-icon" 
+                    title="Exportar Produtos para CSV"
+                    style={{ padding: '8px 14px', gap: '6px', fontSize: '13px', display: 'flex', alignItems: 'center' }}
+                  >
+                    <FileSpreadsheet size={15} /> Exportar CSV
+                  </button>
+                  <button className="btn-gradient" onClick={openAddProduto}>
+                    <Plus size={16} /> Novo Produto
+                  </button>
+                </div>
               </div>
               {loading ? (
                 <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={4} /></div>
@@ -516,6 +650,85 @@ export default function SystemDashboard() {
         )}
 
       </main>
+
+      {/* Detalhes da Venda Modal */}
+      {vendaDetalheModalOpen && (
+        <div className="glass-modal" onClick={() => setVendaDetalheModalOpen(false)}>
+          <div className="modal-content-glass" style={{ maxWidth: '540px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {loadingDetalhe ? 'Carregando...' : `Venda #${vendaDetalhe?.id}`}
+              </h3>
+              <button onClick={() => setVendaDetalheModalOpen(false)} className="modal-close"><X size={20} /></button>
+            </div>
+
+            {loadingDetalhe ? (
+              <div style={{ padding: '20px' }}>
+                <Skeleton variant="row" count={4} />
+              </div>
+            ) : vendaDetalhe ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
+                  <div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Data</span>
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>{new Date(vendaDetalhe.created_at).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Forma de Pagamento</span>
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>{vendaDetalhe.forma_pagamento || 'Dinheiro'} {vendaDetalhe.parcelas && vendaDetalhe.parcelas > 1 ? `(${vendaDetalhe.parcelas}x)` : ''}</span>
+                  </div>
+                  {Number(vendaDetalhe.desconto || 0) > 0 && (
+                    <div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Desconto Aplicado</span>
+                      <span style={{ fontSize: '14px', color: '#2dd4bf', fontWeight: 600 }}>- R$ {Number(vendaDetalhe.desconto).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Valor Total</span>
+                    <span style={{ fontSize: '18px', color: '#2dd4bf', fontWeight: 700 }}>R$ {Number(vendaDetalhe.valor_total).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '14px', color: 'var(--text-main)', marginBottom: '10px' }}>Itens Vendidos</h4>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
+                  <table className="custom-table" style={{ margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th style={{ textAlign: 'center' }}>Qtd</th>
+                        <th style={{ textAlign: 'right' }}>Unitário</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vendaDetalhe.itens && vendaDetalhe.itens.length > 0 ? (
+                        vendaDetalhe.itens.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>{item.produto_nome || `Produto #${item.produtos_id}`}</td>
+                            <td style={{ textAlign: 'center' }}>{item.quantidade}</td>
+                            <td style={{ textAlign: 'right' }}>R$ {Number(item.preco_unitario).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>R$ {(item.quantidade * item.preco_unitario).toFixed(2)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-dim)' }}>Nenhum item registrado.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button 
+                  onClick={() => setVendaDetalheModalOpen(false)}
+                  className="btn-gradient"
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '20px' }}
+                >
+                  Fechar
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Categoria Modal */}
       {categoriaModalOpen && (

@@ -5,11 +5,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const dbConfig = {
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
-    user: process.env.DB_USER,
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+    database: process.env.DB_NAME || 'api_kamikase'
 };
 
 async function runSeed() {
@@ -18,10 +18,10 @@ async function runSeed() {
         connection = await mysql.createConnection(dbConfig);
         console.log('Connected to database, starting seed...');
 
-        const email = 'ale.ramos.oliveira@hotmail.com';
-        const nome = 'Ale Ramos Oliveira';
-        const senhaPlain = 'senha123';
-        const senhaHash = await bcrypt.hash(senhaPlain, 10);
+        const email = process.env.SEED_USER_EMAIL || 'demo@kamikase.com';
+        const nome = process.env.SEED_USER_NAME || 'Lojista Demonstração';
+        const senhaPlain = process.env.SEED_USER_PASSWORD || 'kamikase123';
+        const senhaHash = await bcrypt.hash(senhaPlain, 12);
 
         // Verifica se o usuario existe
         let [usuarios]: any = await connection.execute('SELECT id FROM usuarios WHERE email = ?', [email]);
@@ -39,11 +39,14 @@ async function runSeed() {
             console.log(`Novo usuario criado com ID: ${usuarioId}`);
         }
 
-        // Criar 25 categorias
-        console.log('Criando 25 categorias...');
+        // Criar Categorias
+        console.log('Criando categorias...');
+        const categoriaNomes = [
+            'Eletrônicos', 'Informática', 'Acessórios', 'Vestuário', 
+            'Calçados', 'Alimentos & Bebidas', 'Casa & Decoração', 'Beleza & Saúde'
+        ];
         const categoriaIds = [];
-        for (let i = 1; i <= 25; i++) {
-            const catName = `Categoria Premium ${i}`;
+        for (const catName of categoriaNomes) {
             const [resultInsertCat]: any = await connection.execute(
                 'INSERT INTO categorias (nome, usuarios_id) VALUES (?, ?)',
                 [catName, usuarioId]
@@ -51,26 +54,33 @@ async function runSeed() {
             categoriaIds.push(resultInsertCat.insertId);
         }
 
-        // Criar 290 produtos
-        console.log('Criando 290 produtos (com descrições e preços variáveis)...');
-        for (let i = 1; i <= 290; i++) {
-            const catId = categoriaIds[Math.floor(Math.random() * categoriaIds.length)]; // Categoria aleatória
-            const nomeProd = `Produto Exclusivo ${i}`;
-            const preco = (Math.random() * 900 + 10).toFixed(2); // Preço entre 10 e 910
-            const estoque = Math.floor(Math.random() * 100) + 1; // Estoque entre 1 e 100
-            const descricao = `Descrição detalhada do maravilhoso Produto Exclusivo ${i}. Este produto possui qualidade superior, design moderno e é ideal para quem busca eficiência e estilo. Perfeito para o dia a dia e altamente durável. Aproveite esta oportunidade única!`;
+        // Criar produtos para demonstração
+        console.log('Criando produtos demonstrativos...');
+        const produtosDemo = [
+            { nome: 'Notebook Pro 15" i7 16GB', preco: 4599.90, estoque: 15, cat: 1 },
+            { nome: 'Mouse Sem Fio Ergonômico', preco: 129.90, estoque: 40, cat: 2 },
+            { nome: 'Teclado Mecânico RGB', preco: 289.00, estoque: 25, cat: 2 },
+            { nome: 'Monitor Gamer 27" 144Hz', preco: 1450.00, estoque: 10, cat: 0 },
+            { nome: 'Headset Gamer 7.1 Surround', preco: 320.00, estoque: 30, cat: 2 },
+            { nome: 'Smartphone 128GB 5G', preco: 2199.00, estoque: 18, cat: 0 },
+            { nome: 'Camisa Polo Confort', preco: 89.90, estoque: 50, cat: 3 },
+            { nome: 'Calça Jeans Slim Fit', preco: 149.90, estoque: 35, cat: 3 },
+            { nome: 'Tênis Esportivo Air Runner', preco: 299.90, estoque: 20, cat: 4 },
+            { nome: 'Garrafa Térmica Inox 1L', preco: 79.90, estoque: 60, cat: 6 },
+            { nome: 'Café Especial Gourmet 500g', preco: 34.90, estoque: 80, cat: 5 },
+            { nome: 'Luminária LED de Mesa Articulada', preco: 119.00, estoque: 22, cat: 6 }
+        ];
 
+        for (const prod of produtosDemo) {
+            const catId = categoriaIds[prod.cat % categoriaIds.length];
             await connection.execute(
                 'INSERT INTO produtos (nome, descricao, preco, estoque, categorias_id, usuarios_id) VALUES (?, ?, ?, ?, ?, ?)',
-                [nomeProd, descricao, preco, estoque, catId, usuarioId]
+                [prod.nome, `Produto de alta qualidade para demonstração no Kamikase ERP & PDV.`, prod.preco, prod.estoque, catId, usuarioId]
             );
-
-            if (i % 50 === 0) {
-                console.log(`${i} produtos criados...`);
-            }
         }
 
-        console.log('Seed massivo finalizado com sucesso!');
+        console.log('✅ Seed finalizado com sucesso!');
+        console.log(`🔑 Login de demonstração: ${email} / ${senhaPlain}`);
     } catch (error) {
         console.error('Erro ao executar seed:', error);
     } finally {

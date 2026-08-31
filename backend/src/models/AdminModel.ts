@@ -1,4 +1,5 @@
 import { db } from '../config/database';
+import { RowDataPacket } from 'mysql2';
 
 export class AdminModel {
     static async obterDadosUsuarios() {
@@ -14,16 +15,23 @@ export class AdminModel {
                 (SELECT IFNULL(SUM(valor_total), 0) FROM vendas WHERE usuarios_id = u.id) as valor_total_vendido
             FROM usuarios u
             WHERE u.is_admin = FALSE
+            ORDER BY u.nome ASC
         `;
         
-        const [linhas]: any = await db.execute(query);
+        const [linhas] = await db.execute<RowDataPacket[]>(query);
         return linhas;
     }
 
     static async obterRelatorioGlobal() {
-        const [totalVendas]: any = await db.execute('SELECT COUNT(*) as total, IFNULL(SUM(valor_total), 0) as valor FROM vendas');
-        const [totalProdutos]: any = await db.execute('SELECT COUNT(*) as total, IFNULL(SUM(preco * estoque), 0) as valor FROM produtos');
-        const [totalCategorias]: any = await db.execute('SELECT COUNT(*) as total FROM categorias');
+        const [totalVendas] = await db.execute<RowDataPacket[]>(
+            'SELECT COUNT(*) as total, IFNULL(SUM(valor_total), 0) as valor FROM vendas'
+        );
+        const [totalProdutos] = await db.execute<RowDataPacket[]>(
+            'SELECT COUNT(*) as total, IFNULL(SUM(preco * estoque), 0) as valor FROM produtos'
+        );
+        const [totalCategorias] = await db.execute<RowDataPacket[]>(
+            'SELECT COUNT(*) as total FROM categorias'
+        );
 
         return {
             vendas: totalVendas[0],

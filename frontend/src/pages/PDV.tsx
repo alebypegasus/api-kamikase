@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus } from 'lucide-react';
+import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus, Printer, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -26,6 +26,20 @@ interface CartItem extends Produto {
   quantidade: number;
 }
 
+interface ReceiptData {
+  vendaId: number;
+  itens: CartItem[];
+  subtotal: number;
+  descontoAmount: number;
+  descontoPercent: number;
+  extraFeeAmount: number;
+  total: number;
+  formaPagamento: string;
+  parcelas: number;
+  data: string;
+  operador: string;
+}
+
 export default function PDV() {
   const { userName, logout } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +61,7 @@ export default function PDV() {
   const [desconto, setDesconto] = useState<number>(0);
   const [formaPagamento, setFormaPagamento] = useState<string>('Dinheiro');
   const [parcelas, setParcelas] = useState<number>(1);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   // Clock
   const [clock, setClock] = useState('');
@@ -86,13 +101,14 @@ export default function PDV() {
         e.preventDefault();
         setIsCheckoutModalOpen(true);
       }
-      if (e.key === 'Escape' && isCheckoutModalOpen) {
-        setIsCheckoutModalOpen(false);
+      if (e.key === 'Escape') {
+        if (isCheckoutModalOpen) setIsCheckoutModalOpen(false);
+        if (receiptData) setReceiptData(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart.length, isCheckoutModalOpen]);
+  }, [cart.length, isCheckoutModalOpen, receiptData]);
 
   const fetchCategorias = async () => {
     try {
@@ -174,12 +190,29 @@ export default function PDV() {
     }));
 
     try {
-      await api.post('/vendas', { 
+      const res = await api.post('/vendas', { 
         valor_total: finalTotal, 
         itens,
         desconto: descontoAmount,
         forma_pagamento: formaPagamento,
         parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1
+      });
+
+      const vendaId = res.data.id || Date.now();
+
+      // Set receipt data for the receipt modal
+      setReceiptData({
+        vendaId,
+        itens: [...cart],
+        subtotal: cartTotal,
+        descontoAmount,
+        descontoPercent,
+        extraFeeAmount,
+        total: finalTotal,
+        formaPagamento,
+        parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1,
+        data: new Date().toLocaleString('pt-BR'),
+        operador: userName || 'Caixa'
       });
 
       showNotification('Venda realizada com sucesso!');
@@ -189,10 +222,15 @@ export default function PDV() {
       setFormaPagamento('Dinheiro');
       setParcelas(1);
       fetchProdutos();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showNotification('Erro ao processar venda.');
+      const erroMsg = err.response?.data?.erro || err.response?.data?.mensagem || 'Erro ao processar venda.';
+      showNotification(erroMsg);
     }
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
   };
 
   const handleLogout = () => {
@@ -542,6 +580,115 @@ export default function PDV() {
 
               <button className="pdv-btn-gradient" style={{ width: '100%', marginTop: '8px' }} onClick={handleCheckout}>
                 Confirmar Transação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Receipt / Cupom Modal */}
+      {receiptData && (
+        <div className="glass-modal" onClick={() => setReceiptData(null)}>
+          <div className="modal-content-glass" style={{ width: '450px', background: '#0f172a' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Receipt size={22} color="#2dd4bf" />
+                <h2 className="modal-title">Comprovante de Venda</h2>
+              </div>
+              <button onClick={() => setReceiptData(null)} className="modal-close">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Receipt Body */}
+            <div className="receipt-paper" id="printable-receipt" style={{
+              background: '#ffffff',
+              color: '#000000',
+              padding: '24px',
+              borderRadius: '8px',
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              lineHeight: '1.4',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              marginBottom: '20px'
+            }}>
+              <div style={{ textAlign: 'center', borderBottom: '1px dashed #666', paddingBottom: '12px', marginBottom: '12px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>KAMIKASE ERP & PDV</h3>
+                <p style={{ margin: 0, fontSize: '11px', color: '#555' }}>CUPOM NÃO FISCAL</p>
+                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#555' }}>Venda #{receiptData.vendaId} • {receiptData.data}</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#555' }}>Operador: {receiptData.operador}</p>
+              </div>
+
+              <div style={{ borderBottom: '1px dashed #666', paddingBottom: '8px', marginBottom: '8px' }}>
+                <table style={{ width: '100%', textAlign: 'left', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #ccc' }}>
+                      <th style={{ padding: '4px 0' }}>Item</th>
+                      <th style={{ textAlign: 'center' }}>Qtd</th>
+                      <th style={{ textAlign: 'right' }}>Unit</th>
+                      <th style={{ textAlign: 'right' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receiptData.itens.map((item, idx) => (
+                      <tr key={idx}>
+                        <td style={{ padding: '3px 0', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</td>
+                        <td style={{ textAlign: 'center' }}>{item.quantidade}</td>
+                        <td style={{ textAlign: 'right' }}>R$ {Number(item.preco).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold' }}>R$ {(item.quantidade * item.preco).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal:</span>
+                  <span>R$ {receiptData.subtotal.toFixed(2)}</span>
+                </div>
+                {receiptData.descontoAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669' }}>
+                    <span>Desconto ({receiptData.descontoPercent}%):</span>
+                    <span>- R$ {receiptData.descontoAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {receiptData.extraFeeAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626' }}>
+                    <span>Juros Parcelamento:</span>
+                    <span>+ R$ {receiptData.extraFeeAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px', borderTop: '1px solid #000', paddingTop: '6px', marginTop: '4px' }}>
+                  <span>TOTAL:</span>
+                  <span>R$ {receiptData.total.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#555', marginTop: '4px' }}>
+                  <span>Pagamento:</span>
+                  <span>{receiptData.formaPagamento} {receiptData.parcelas > 1 ? `(${receiptData.parcelas}x)` : ''}</span>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', borderTop: '1px dashed #666', paddingTop: '10px', marginTop: '12px', fontSize: '10px', color: '#777' }}>
+                Obrigado pela preferência! Volte sempre!
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={handlePrintReceipt}
+                className="btn-gradient" 
+                style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+              >
+                <Printer size={18} /> Imprimir Cupom
+              </button>
+              <button 
+                onClick={() => setReceiptData(null)}
+                className="btn-icon" 
+                style={{ padding: '12px 20px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', color: '#e2e8f0' }}
+              >
+                Nova Venda
               </button>
             </div>
           </div>

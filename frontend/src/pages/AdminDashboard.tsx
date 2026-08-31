@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Package, ShoppingBag, LogOut, ShieldAlert, ArrowUpDown } from 'lucide-react';
+import { Users, Package, ShoppingBag, LogOut, ShieldAlert, ArrowUpDown, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -34,6 +34,30 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportarRelatorioAdminCSV = () => {
+    if (!dashboardData.usuarios || dashboardData.usuarios.length === 0) return;
+
+    const headers = ['ID', 'Lojista', 'E-mail', 'Qtd Produtos', 'Patrimônio em Estoque (R$)', 'Qtd Vendas', 'Faturamento Total (R$)'];
+    const rows = dashboardData.usuarios.map((u: any) => [
+      u.usuario_id,
+      `"${u.nome.replace(/"/g, '""')}"`,
+      u.email,
+      u.total_produtos,
+      Number(u.valor_total_estoque).toFixed(2),
+      u.total_vendas,
+      Number(u.valor_total_vendido).toFixed(2)
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r: any[]) => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kamikase_relatorio_lojistas_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleLogout = () => {
@@ -166,9 +190,19 @@ export default function AdminDashboard() {
         <div className="content-panel-admin animate-fade-in">
           <div className="panel-admin-controls">
             <h3>Desempenho por Usuário (Lojistas)</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)', fontSize: '13px' }}>
-              <ArrowUpDown size={14} />
-              <span>Clique nos cabeçalhos para ordenar</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button 
+                onClick={exportarRelatorioAdminCSV}
+                className="btn-icon-admin" 
+                style={{ padding: '8px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                title="Exportar dados dos lojistas para CSV"
+              >
+                <Download size={15} /> Exportar CSV
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)', fontSize: '13px' }}>
+                <ArrowUpDown size={14} />
+                <span>Clique nos cabeçalhos para ordenar</span>
+              </div>
             </div>
           </div>
           

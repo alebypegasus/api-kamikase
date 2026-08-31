@@ -4,11 +4,11 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { UsuarioModel } from '../models/UsuarioModel';
 
+// Schema de cadastro público — SEM is_admin (prevenção de escalação de privilégio)
 const cadastrarSchema = z.object({
-    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
-    email: z.string().email("Formato de email inválido"),
-    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-    is_admin: z.boolean().optional()
+    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(255, "Nome deve ter no máximo 255 caracteres"),
+    email: z.string().email("Formato de email inválido").max(255, "Email deve ter no máximo 255 caracteres"),
+    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").max(128, "Senha deve ter no máximo 128 caracteres"),
 });
 
 const loginSchema = z.object({
@@ -22,14 +22,14 @@ const idSchema = z.object({
 
 const atualizarSchema = z.object({
     id: z.union([z.string(), z.number()]).transform(val => Number(val)),
-    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").optional(),
-    email: z.string().email("Formato de email inválido").optional(),
-    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").optional()
+    nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(255).optional(),
+    email: z.string().email("Formato de email inválido").max(255).optional(),
+    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").max(128).optional()
 });
 
 export class UsuarioController {
     static async cadastrar(req: Request, res: Response): Promise<void> {
-        const { nome, email, senha, is_admin } = cadastrarSchema.parse(req.body);
+        const { nome, email, senha } = cadastrarSchema.parse(req.body);
 
         const usuarioExistente = await UsuarioModel.buscarPorEmail(email);
         if (usuarioExistente) {
@@ -37,16 +37,16 @@ export class UsuarioController {
             return;
         }
 
-        const senhaCriptografada = await bcrypt.hash(senha, 10);
+        const senhaCriptografada = await bcrypt.hash(senha, 12);
 
         const novoId = await UsuarioModel.criar({
             nome,
             email,
             senha: senhaCriptografada,
-            is_admin: is_admin || false
+            is_admin: false // Sempre false no cadastro público
         });
 
-        res.status(201).json({ mensagem: 'Usuario cadastrado com sucesso.', id: novoId });
+        res.status(201).json({ mensagem: 'Usuário cadastrado com sucesso.', id: novoId });
     }
 
     static async login(req: Request, res: Response): Promise<void> {
@@ -54,13 +54,13 @@ export class UsuarioController {
 
         const usuario = await UsuarioModel.buscarPorEmail(email);
         if (!usuario) {
-            res.status(401).json({ mensagem: 'Credenciais invalidas' });
+            res.status(401).json({ mensagem: 'Credenciais inválidas.' });
             return;
         }
 
         const senhaValida = await bcrypt.compare(senha, usuario.senha!);
         if (!senhaValida) {
-            res.status(401).json({ mensagem: 'Credenciais invalidas' });
+            res.status(401).json({ mensagem: 'Credenciais inválidas.' });
             return;
         }
 
@@ -99,7 +99,7 @@ export class UsuarioController {
     static async atualizar(req: Request, res: Response): Promise<void> {
         const { id, nome, email, senha } = atualizarSchema.parse(req.body);
 
-        const dadosAtualizacao: any = {};
+        const dadosAtualizacao: Record<string, string> = {};
         if (nome) dadosAtualizacao.nome = nome;
 
         if (email) {
@@ -112,7 +112,7 @@ export class UsuarioController {
         }
 
         if (senha) {
-            dadosAtualizacao.senha = await bcrypt.hash(senha, 10);
+            dadosAtualizacao.senha = await bcrypt.hash(senha, 12);
         }
 
         if (Object.keys(dadosAtualizacao).length === 0) {
