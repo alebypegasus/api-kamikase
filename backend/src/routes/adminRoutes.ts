@@ -9,5 +9,11 @@ router.use(authMiddleware);
 router.use(adminMiddleware);
 
 router.get('/dashboard', AdminController.obterDashboard);
+router.get('/vendas', AdminController.listarTodasVendas);
+router.get('/vendas/:id', AdminController.obterDetalhesVenda);
+router.get('/produtos', AdminController.listarTodosProdutos);
+router.post('/usuarios', AdminController.criarLojista);
+router.put('/usuarios/:id/senha', AdminController.resetarSenhaLojista);
+router.get('/usuarios/:id/detalhes', AdminController.obterDetalhesLojista);
 
 export default router;

@@ -19,6 +19,9 @@ async function run() {
         const schemaPath = path.resolve(__dirname, '../../../db/schema.sql');
         const schema = fs.readFileSync(schemaPath, 'utf8');
 
+        console.log('Dropping old database to recreate from scratch...');
+        await connection.query('DROP DATABASE IF EXISTS api_kamikase;');
+
         console.log('Executing schema.sql...');
         await connection.query(schema);
 

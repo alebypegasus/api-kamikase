@@ -24,7 +24,9 @@ const atualizarSchema = z.object({
     id: z.union([z.string(), z.number()]).transform(val => Number(val)),
     nome: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(255).optional(),
     email: z.string().email("Formato de email inválido").max(255).optional(),
-    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").max(128).optional()
+    senha: z.string().min(6, "Senha deve ter pelo menos 6 caracteres").max(128).optional(),
+    ativo: z.boolean().optional(),
+    unidade_id: z.union([z.number(), z.null()]).optional()
 });
 
 export class UsuarioController {
@@ -58,6 +60,11 @@ export class UsuarioController {
             return;
         }
 
+        if (usuario.ativo === false) {
+            res.status(403).json({ mensagem: 'Conta desativada. Entre em contato com a administração.' });
+            return;
+        }
+
         const senhaValida = await bcrypt.compare(senha, usuario.senha!);
         if (!senhaValida) {
             res.status(401).json({ mensagem: 'Credenciais inválidas.' });
@@ -87,19 +94,19 @@ export class UsuarioController {
     static async deletar(req: Request, res: Response): Promise<void> {
         const { id } = idSchema.parse(req.body);
 
-        const deletado = await UsuarioModel.deletar(id);
+        const deletado = await UsuarioModel.desativar(id);
         if (!deletado) {
             res.status(404).json({ mensagem: 'Usuário não encontrado.' });
             return;
         }
 
-        res.status(200).json({ mensagem: 'Usuário deletado com sucesso.' });
+        res.status(200).json({ mensagem: 'Usuário desativado com sucesso.' });
     }
 
     static async atualizar(req: Request, res: Response): Promise<void> {
-        const { id, nome, email, senha } = atualizarSchema.parse(req.body);
+        const { id, nome, email, senha, ativo, unidade_id } = atualizarSchema.parse(req.body);
 
-        const dadosAtualizacao: Record<string, string> = {};
+        const dadosAtualizacao: Record<string, any> = {};
         if (nome) dadosAtualizacao.nome = nome;
 
         if (email) {
@@ -113,6 +120,13 @@ export class UsuarioController {
 
         if (senha) {
             dadosAtualizacao.senha = await bcrypt.hash(senha, 12);
+        }
+
+        // Apenas admin pode alterar status e unidade
+        const isUserAdmin = (req as any).isAdmin || (req as any).usuario?.is_admin;
+        if (isUserAdmin) {
+            if (ativo !== undefined) dadosAtualizacao.ativo = ativo;
+            if (unidade_id !== undefined) dadosAtualizacao.unidade_id = unidade_id;
         }
 
         if (Object.keys(dadosAtualizacao).length === 0) {

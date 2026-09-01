@@ -13,6 +13,7 @@ import categoriaRoutes from './routes/categoriaRoutes';
 import produtoRoutes from './routes/produtoRoutes';
 import vendaRoutes from './routes/vendaRoutes';
 import adminRoutes from './routes/adminRoutes';
+import unidadeRoutes from './routes/unidadeRoutes';
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use('/api/categorias', categoriaRoutes);
 app.use('/api/produtos', produtoRoutes);
 app.use('/api/vendas', vendaRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/unidades', unidadeRoutes);
 
 // 404 handler for unknown routes
 app.use((_req, res) => {

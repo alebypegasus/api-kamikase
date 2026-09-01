@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign, Eye, Download, FileSpreadsheet } from 'lucide-react';
+import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign, Eye, Download, FileSpreadsheet, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -7,6 +7,7 @@ import AnimatedCounter from '../components/AnimatedCounter';
 import SearchInput from '../components/SearchInput';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
+import ThemeToggle from '../components/ThemeToggle';
 import Skeleton, { SkeletonTable } from '../components/Skeleton';
 
 interface Produto {
@@ -357,8 +358,8 @@ export default function SystemDashboard() {
 
       {/* Sidebar */}
       <aside className="glass-sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-icon"><Cpu size={24} /></div>
+        <div className="sidebar-brand" style={{ position: 'relative' }}>
+          <div className="brand-icon" style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' }}><Cpu size={24} /></div>
           <span className="sidebar-brand-text neon-text">Kamikase ERP & PDV</span>
         </div>
 
@@ -396,13 +397,16 @@ export default function SystemDashboard() {
 
       {/* Main Content */}
       <main className="sys-main-content">
-        <div className="page-header">
-          <h1>
-            {view === 'dashboard' && 'Visão Geral do Negócio'}
-            {view === 'produtos' && 'Catálogo de Produtos'}
-            {view === 'categorias' && 'Gestão de Categorias'}
-          </h1>
-          <p>Gerencie seu inventário e acompanhe resultados comerciais.</p>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {view === 'dashboard' && <><TrendingUp size={22} style={{ color: 'var(--primary)' }} /> Visão Geral do Negócio</>}
+              {view === 'produtos' && <><Package size={22} style={{ color: 'var(--primary)' }} /> Catálogo de Produtos</>}
+              {view === 'categorias' && <><Tag size={22} style={{ color: 'var(--primary)' }} /> Gestão de Categorias</>}
+            </h1>
+            <p>Gerencie seu inventário e acompanhe resultados comerciais.</p>
+          </div>
+          <ThemeToggle />
         </div>
 
         {view === 'dashboard' && (
@@ -416,21 +420,21 @@ export default function SystemDashboard() {
               </div>
             ) : (
               <div className="stat-grid">
-                <div className="stat-card animate-fade-in animate-stagger-1">
+                <div className="stat-card hover-lift animate-slide-up" style={{ animationDelay: '0s' }}>
                   <div>
                     <div className="stat-card-label">Total de Produtos</div>
                     <div className="stat-card-value"><AnimatedCounter value={totalProdutos} /></div>
                   </div>
                   <div className="stat-icon purple"><Package size={28} /></div>
                 </div>
-                <div className="stat-card animate-fade-in animate-stagger-2">
+                <div className="stat-card hover-lift animate-slide-up" style={{ animationDelay: '0.08s' }}>
                   <div>
                     <div className="stat-card-label">Categorias Ativas</div>
                     <div className="stat-card-value"><AnimatedCounter value={totalCategorias} /></div>
                   </div>
                   <div className="stat-icon cyan"><Tag size={28} /></div>
                 </div>
-                <div className="stat-card animate-fade-in animate-stagger-3">
+                <div className="stat-card hover-lift animate-slide-up" style={{ animationDelay: '0.16s' }}>
                   <div>
                     <div className="stat-card-label">Vendas Registradas</div>
                     <div className="stat-card-value" style={{ color: 'var(--accent-light)' }}>
@@ -439,7 +443,7 @@ export default function SystemDashboard() {
                   </div>
                   <div className="stat-icon teal"><ShoppingBag size={28} /></div>
                 </div>
-                <div className="stat-card animate-fade-in animate-stagger-4">
+                <div className="stat-card hover-lift animate-slide-up" style={{ animationDelay: '0.24s' }}>
                   <div>
                     <div className="stat-card-label">Valor em Estoque</div>
                     <div className="stat-card-value" style={{ color: 'var(--accent-light)', fontSize: '22px' }}>

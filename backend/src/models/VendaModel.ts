@@ -8,18 +8,20 @@ export class VendaModel {
         await connection.beginTransaction();
 
         try {
+            // Insere a venda inicialmente com valor_total = 0
             const [resultado] = await connection.execute<ResultSetHeader>(
-                'INSERT INTO vendas (usuarios_id, valor_total, desconto, forma_pagamento, parcelas) VALUES (?, ?, ?, ?, ?)',
-                [venda.usuarios_id, venda.valor_total, venda.desconto || 0, venda.forma_pagamento || 'Dinheiro', venda.parcelas || 1]
+                'INSERT INTO vendas (usuarios_id, valor_total, desconto, forma_pagamento, parcelas) VALUES (?, 0, ?, ?, ?)',
+                [venda.usuarios_id, venda.desconto || 0, venda.forma_pagamento || 'Dinheiro', venda.parcelas || 1]
             );
             
             const vendaId = resultado.insertId;
+            let valor_total_calculado = 0;
 
             if (venda.itens && venda.itens.length > 0) {
                 for (const item of venda.itens) {
-                    // Verificar estoque disponível antes de decrementar
+                    // Buscar o preço e o estoque diretamente do banco
                     const [estoqueRows] = await connection.execute<RowDataPacket[]>(
-                        'SELECT estoque, nome FROM produtos WHERE id = ? AND usuarios_id = ? FOR UPDATE',
+                        'SELECT estoque, nome, preco FROM produtos WHERE id = ? AND usuarios_id = ? FOR UPDATE',
                         [item.produtos_id, venda.usuarios_id]
                     );
 
@@ -35,9 +37,12 @@ export class VendaModel {
                         );
                     }
 
+                    const precoUnitarioDB = Number(produto.preco);
+                    valor_total_calculado += precoUnitarioDB * item.quantidade;
+
                     await connection.execute(
                         'INSERT INTO itens_venda (vendas_id, produtos_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)',
-                        [vendaId, item.produtos_id, item.quantidade, item.preco_unitario]
+                        [vendaId, item.produtos_id, item.quantidade, precoUnitarioDB]
                     );
 
                     // Atualiza estoque com condição de segurança
@@ -47,6 +52,16 @@ export class VendaModel {
                     );
                 }
             }
+
+            // Aplicar desconto (opcional)
+            let valor_final = valor_total_calculado - (venda.desconto || 0);
+            if (valor_final < 0) valor_final = 0;
+
+            // Atualizar a venda com o valor_total calculado
+            await connection.execute(
+                'UPDATE vendas SET valor_total = ? WHERE id = ?',
+                [valor_final, vendaId]
+            );
 
             await connection.commit();
             connection.release();

@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus, Printer, Receipt } from 'lucide-react';
+import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus, Printer, Receipt, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import SearchInput from '../components/SearchInput';
 import QuantitySelector from '../components/QuantitySelector';
+import GlowButton from '../components/GlowButton';
+import ThemeToggle from '../components/ThemeToggle';
 import { SkeletonGrid } from '../components/Skeleton';
 
 interface Produto {
@@ -42,6 +45,7 @@ interface ReceiptData {
 
 export default function PDV() {
   const { userName, logout } = useAuth();
+  const { playBeep, playSuccessSound } = useTheme();
   const navigate = useNavigate();
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -62,6 +66,7 @@ export default function PDV() {
   const [formaPagamento, setFormaPagamento] = useState<string>('Dinheiro');
   const [parcelas, setParcelas] = useState<number>(1);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Clock
   const [clock, setClock] = useState('');
@@ -144,10 +149,11 @@ export default function PDV() {
       return [...prev, { ...produto, quantidade: 1 }];
     });
 
-    // Show "added" badge
+    // Show "added" badge & play feedback beep
     setAddedProductId(produto.id);
+    playBeep();
     setTimeout(() => setAddedProductId(null), 800);
-  }, []);
+  }, [playBeep]);
 
   const updateCartQuantity = useCallback((id: number, newQty: number) => {
     setCart(prev => prev.map(item => 
@@ -215,9 +221,14 @@ export default function PDV() {
         operador: userName || 'Caixa'
       });
 
-      showNotification('Venda realizada com sucesso!');
       setCart([]);
       setIsCheckoutModalOpen(false);
+
+      // Trigger confetti celebration & success sound
+      setShowCelebration(true);
+      playSuccessSound();
+      launchConfetti();
+      setTimeout(() => setShowCelebration(false), 2500);
       setDesconto(0);
       setFormaPagamento('Dinheiro');
       setParcelas(1);
@@ -236,6 +247,30 @@ export default function PDV() {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const launchConfetti = () => {
+    const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#fcd34d'];
+    for (let i = 0; i < 40; i++) {
+      const el = document.createElement('div');
+      el.className = 'confetti-piece';
+      el.style.left = `${40 + Math.random() * 20}%`;
+      el.style.top = `${40 + Math.random() * 20}%`;
+      el.style.background = colors[Math.floor(Math.random() * colors.length)];
+      el.style.transform = `rotate(${Math.random() * 360}deg)`;
+      el.style.animationDuration = `${0.8 + Math.random() * 0.8}s`;
+      el.style.animationDelay = `${Math.random() * 0.3}s`;
+      const dx = (Math.random() - 0.5) * 300;
+      const dy = -(80 + Math.random() * 150);
+      el.style.setProperty('--dx', `${dx}px`);
+      el.style.setProperty('--dy', `${dy}px`);
+      el.animate([
+        { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${360 + Math.random() * 360}deg)`, opacity: 0 }
+      ], { duration: 1200, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' });
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1500);
+    }
   };
 
   // Hierarchy Logic
@@ -285,6 +320,8 @@ export default function PDV() {
         
         <div className="pdv-header-right">
           <span className="pdv-clock">{clock}</span>
+
+          <ThemeToggle />
 
           <button className="pdv-nav-btn" onClick={() => navigate('/system')}>
             <Layers size={16} /> <span>Sistema</span>
@@ -379,7 +416,7 @@ export default function PDV() {
               {filteredProdutos.map((prod, i) => (
                 <div 
                   key={prod.id} 
-                  className={`pdv-product-card ${prod.estoque <= 0 ? 'disabled' : ''} animate-fade-in animate-stagger-${Math.min(i + 1, 8)}`}
+                  className={`pdv-product-card card-3d ${prod.estoque <= 0 ? 'disabled' : ''} animate-fade-in animate-stagger-${Math.min(i + 1, 8)}`}
                   onClick={() => prod.estoque > 0 && addToCart(prod)}
                 >
                   {addedProductId === prod.id && (
@@ -479,15 +516,15 @@ export default function PDV() {
               <span className="neon-text">R$ {cartTotal.toFixed(2)}</span>
             </div>
             
-            <button 
+            <GlowButton 
               className="pdv-btn-gradient" 
               style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
               disabled={cart.length === 0}
               onClick={() => setIsCheckoutModalOpen(true)}
             >
-              Processar Pagamento <ChevronRight size={20} />
+              <Sparkles size={18} /> Processar Pagamento <ChevronRight size={20} />
               <span className="kbd-hint" style={{ marginLeft: '4px' }}>F12</span>
-            </button>
+            </GlowButton>
           </div>
         </div>
 
@@ -578,9 +615,9 @@ export default function PDV() {
                 <div style={{ fontSize: '32px', fontWeight: 800, color: '#2dd4bf' }}>R$ {finalTotal.toFixed(2)}</div>
               </div>
 
-              <button className="pdv-btn-gradient" style={{ width: '100%', marginTop: '8px' }} onClick={handleCheckout}>
-                Confirmar Transação
-              </button>
+              <GlowButton className="pdv-btn-gradient" style={{ width: '100%', marginTop: '8px' }} onClick={handleCheckout}>
+                <CheckCircle size={18} /> Confirmar Transação
+              </GlowButton>
             </div>
           </div>
         </div>
@@ -692,6 +729,16 @@ export default function PDV() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Success Celebration */}
+      {showCelebration && (
+        <div className="success-celebration">
+          <div className="success-icon">
+            <CheckCircle size={40} color="white" />
+          </div>
+          <div className="success-text">Venda Realizada! 🎉</div>
         </div>
       )}
     </div>

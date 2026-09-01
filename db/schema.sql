@@ -1,16 +1,28 @@
 CREATE DATABASE IF NOT EXISTS api_kamikase;
 USE api_kamikase;
 
+CREATE TABLE IF NOT EXISTS unidades (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     senha VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
+    ativo BOOLEAN DEFAULT TRUE,
+    unidade_id INT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (unidade_id) REFERENCES unidades(id) ON DELETE SET NULL,
     INDEX idx_usuarios_email (email),
-    INDEX idx_usuarios_is_admin (is_admin)
+    INDEX idx_usuarios_is_admin (is_admin),
+    INDEX idx_usuarios_ativo (ativo),
+    INDEX idx_usuarios_unidade (unidade_id)
 );
 
 CREATE TABLE IF NOT EXISTS categorias (

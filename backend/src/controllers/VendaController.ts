@@ -5,17 +5,17 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import { IVenda } from '../types';
 
 const itemVendaSchema = z.object({
-    produtos_id: z.number({ message: "ID do produto é obrigatório" }).int().positive(),
-    quantidade: z.number({ message: "Quantidade é obrigatória" }).int().positive("Quantidade deve ser maior que zero"),
-    preco_unitario: z.number({ message: "Preço unitário é obrigatório" }).positive("Preço unitário deve ser positivo"),
+    produtos_id: z.coerce.number({ message: "ID do produto é obrigatório" }).int().positive(),
+    quantidade: z.coerce.number({ message: "Quantidade é obrigatória" }).int().positive("Quantidade deve ser maior que zero"),
+    preco_unitario: z.coerce.number().optional().default(0),
 });
 
 const criarVendaSchema = z.object({
-    valor_total: z.number({ message: "Valor total é obrigatório" }).positive("Valor total deve ser positivo"),
+    valor_total: z.coerce.number().optional().default(0),
     itens: z.array(itemVendaSchema).min(1, "A venda deve conter pelo menos 1 item"),
-    desconto: z.number().min(0).optional().default(0),
+    desconto: z.coerce.number().min(0).optional().default(0),
     forma_pagamento: z.string().max(50).optional().default('Dinheiro'),
-    parcelas: z.number().int().min(1).max(12).optional().default(1),
+    parcelas: z.coerce.number().int().min(1).max(12).optional().default(1),
 });
 
 export class VendaController {

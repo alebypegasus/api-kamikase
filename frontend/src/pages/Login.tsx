@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingBag, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { ShoppingBag, Lock, Mail, User, Eye, EyeOff, AlertCircle, CheckCircle, X, Zap, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import GlowButton from '../components/GlowButton';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Login() {
   const { login, token, isAdmin } = useAuth();
@@ -23,6 +25,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [shakeError, setShakeError] = useState(false);
   const [alerts, setAlerts] = useState<{id: number, type: string, message: string}[]>([]);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Password strength
   const passwordStrength = useMemo(() => {
@@ -143,32 +146,63 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-container">
-      {/* Floating particles */}
+    <div className="auth-container" style={{
+      background: 'linear-gradient(-45deg, #0a0b10, #0f172a, #1a0a2e, #0a1628, #0a0b10)',
+      backgroundSize: '400% 400%',
+      animation: 'morphGradient 15s ease infinite'
+    }}>
+      {/* Theme Toggle Top Right */}
+      <div style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 100 }}>
+        <ThemeToggle />
+      </div>
+
+      {/* Enhanced floating particles with connections */}
       <div className="auth-particles">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(12)].map((_, i) => (
           <div
             key={i}
             className="auth-particle"
             style={{
-              width: `${8 + Math.random() * 16}px`,
-              height: `${8 + Math.random() * 16}px`,
+              width: `${4 + Math.random() * 12}px`,
+              height: `${4 + Math.random() * 12}px`,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              '--duration': `${5 + Math.random() * 8}s`,
-              '--delay': `${Math.random() * 3}s`,
-              background: i % 2 === 0 
-                ? 'rgba(139, 92, 246, 0.15)' 
-                : 'rgba(6, 182, 212, 0.12)',
+              '--duration': `${6 + Math.random() * 10}s`,
+              '--delay': `${Math.random() * 4}s`,
+              background: [
+                'rgba(139, 92, 246, 0.2)',
+                'rgba(6, 182, 212, 0.15)',
+                'rgba(236, 72, 153, 0.12)',
+                'rgba(20, 184, 166, 0.15)'
+              ][i % 4],
+              borderRadius: i % 3 === 0 ? '50%' : '2px',
             } as React.CSSProperties}
           />
         ))}
       </div>
 
+      {/* Ambient glow orbs */}
+      <div style={{
+        position: 'fixed', top: '20%', left: '15%',
+        width: '300px', height: '300px',
+        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%)',
+        borderRadius: '50%', filter: 'blur(60px)',
+        animation: 'float 8s ease-in-out infinite',
+        pointerEvents: 'none'
+      }} />
+      <div style={{
+        position: 'fixed', bottom: '15%', right: '10%',
+        width: '250px', height: '250px',
+        background: 'radial-gradient(circle, rgba(6, 182, 212, 0.06) 0%, transparent 70%)',
+        borderRadius: '50%', filter: 'blur(50px)',
+        animation: 'float 10s ease-in-out infinite reverse',
+        pointerEvents: 'none'
+      }} />
+
       {/* Toast alerts */}
       <div className="alert-container">
         {alerts.map(alert => (
-          <div key={alert.id} className={`alert-toast ${alert.type}`}>
+          <div key={alert.id} className={`alert-toast ${alert.type} animate-slide-up`}>
             {alert.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
             <span className="alert-message">{alert.message}</span>
             <button className="alert-close" onClick={() => setAlerts(p => p.filter(a => a.id !== alert.id))}>
@@ -178,66 +212,98 @@ export default function Login() {
         ))}
       </div>
 
-      <div className={`auth-card animate-fade-in ${shakeError ? 'shake-error' : ''}`}>
+      <div className={`auth-card animate-slide-up gradient-border ${shakeError ? 'shake-error' : ''}`}
+        style={{ overflow: 'visible' }}
+      >
+        {/* Decorative top accent */}
+        <div style={{
+          position: 'absolute', top: '-1px', left: '20%', right: '20%', height: '2px',
+          background: 'linear-gradient(90deg, transparent, var(--primary), var(--secondary), transparent)',
+          borderRadius: '2px'
+        }} />
+
         <div className="auth-header">
-          <div className="auth-logo animate-float">
+          <div className="auth-logo" style={{
+            background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+            boxShadow: '0 8px 32px rgba(139, 92, 246, 0.35)',
+            animation: 'breathe 3s ease-in-out infinite',
+          }}>
             <ShoppingBag size={32} />
           </div>
-          <h1 className="auth-title">Kamikase ERP & PDV</h1>
-          <p className="auth-subtitle">
-            {authState === 'login' ? 'Entre na sua conta para acessar o sistema' : 'Crie sua conta para começar'}
+          <h1 className="auth-title" style={{
+            background: 'linear-gradient(135deg, #e2e8f0, #f8fafc, #a78bfa)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+            Kamikase ERP & PDV
+          </h1>
+          <p className="auth-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+            {authState === 'login' ? (
+              <><Shield size={14} style={{ color: 'var(--primary)' }} /> Acesse sua conta com segurança</>
+            ) : (
+              <><Zap size={14} style={{ color: 'var(--accent)' }} /> Crie sua conta para começar</>
+            )}
           </p>
         </div>
 
         <form onSubmit={authState === 'login' ? handleLogin : handleRegister}>
           {authState === 'register' && (
-            <div className="form-group animate-fade-in">
+            <div className="form-group animate-slide-up" style={{ animationDelay: '0.05s' }}>
               <label className="form-label">Nome Completo</label>
-              <div className="input-wrapper">
-                <User className="input-icon" size={18} />
+              <div className="input-wrapper" style={focusedField === 'nome' ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.12)' } : {}}>
+                <User className="input-icon" size={18} style={focusedField === 'nome' ? { color: 'var(--primary)' } : {}} />
                 <input 
                   type="text" 
                   className="form-input" 
                   placeholder="Seu nome"
                   value={authNome}
                   onChange={(e) => setAuthNome(e.target.value)}
+                  onFocus={() => setFocusedField('nome')}
+                  onBlur={() => setFocusedField(null)}
                   required
                 />
               </div>
             </div>
           )}
 
-          <div className="form-group">
+          <div className="form-group" style={authState === 'register' ? { animationDelay: '0.1s' } : {}}>
             <label className="form-label">E-mail</label>
-            <div className="input-wrapper">
-              <Mail className="input-icon" size={18} />
+            <div className="input-wrapper" style={focusedField === 'email' ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.12)' } : {}}>
+              <Mail className="input-icon" size={18} style={focusedField === 'email' ? { color: 'var(--primary)' } : {}} />
               <input 
                 type="email" 
                 className="form-input" 
                 placeholder="seu@email.com"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
                 required
               />
             </div>
           </div>
 
-          <div className="form-group">
+          <div className="form-group" style={authState === 'register' ? { animationDelay: '0.15s' } : {}}>
             <label className="form-label">Senha</label>
-            <div className="input-wrapper">
-              <Lock className="input-icon" size={18} />
+            <div className="input-wrapper" style={focusedField === 'senha' ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.12)' } : {}}>
+              <Lock className="input-icon" size={18} style={focusedField === 'senha' ? { color: 'var(--primary)' } : {}} />
               <input 
                 type={showPassword ? "text" : "password"} 
                 className="form-input" 
                 placeholder="Sua senha"
                 value={authSenha}
                 onChange={(e) => setAuthSenha(e.target.value)}
+                onFocus={() => setFocusedField('senha')}
+                onBlur={() => setFocusedField(null)}
                 required
               />
               <button
                 type="button"
-                style={{ position: 'absolute', right: '14px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+                style={{ position: 'absolute', right: '14px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', transition: 'color 0.2s' }}
                 onClick={() => setShowPassword(!showPassword)}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#e2e8f0')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -254,16 +320,27 @@ export default function Login() {
             )}
           </div>
 
-          <button type="submit" className={`btn btn-primary ${isLoading ? 'btn-loading' : ''}`} disabled={isLoading}>
+          <GlowButton 
+            type="submit" 
+            className={`btn btn-primary ${isLoading ? 'btn-loading' : ''}`}
+            disabled={isLoading}
+            style={{ width: '100%' }}
+          >
             {isLoading ? (
               <>
                 <div className="btn-spinner" />
                 Processando...
               </>
             ) : (
-              authState === 'login' ? 'Entrar no Sistema' : 'Criar Conta'
+              <>
+                {authState === 'login' ? (
+                  <><Lock size={16} /> Entrar no Sistema</>
+                ) : (
+                  <><Zap size={16} /> Criar Conta</>
+                )}
+              </>
             )}
-          </button>
+          </GlowButton>
 
           <div className="auth-switch-text">
             {authState === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'}{' '}
@@ -271,11 +348,22 @@ export default function Login() {
               type="button" 
               className="auth-switch-btn"
               onClick={switchAuthState}
+              style={{ transition: 'all 0.2s' }}
             >
               {authState === 'login' ? 'Cadastre-se' : 'Faça login'}
             </button>
           </div>
         </form>
+
+        {/* Footer branding */}
+        <div style={{ 
+          textAlign: 'center', marginTop: '24px', paddingTop: '16px',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+          fontSize: '11px', color: 'var(--text-dim)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+        }}>
+          <Shield size={12} /> Sistema protegido com criptografia de ponta a ponta
+        </div>
       </div>
     </div>
   );

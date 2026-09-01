@@ -4,6 +4,8 @@
         email: string;
         senha?: string;
         is_admin?: boolean;
+        ativo?: boolean;
+        unidade_id?: number;
     }
 
     export interface ICategoria {

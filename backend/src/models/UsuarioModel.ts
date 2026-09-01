@@ -3,7 +3,7 @@ import { IUsuario } from '../types';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 // Whitelist de campos permitidos para atualização (previne SQL injection via nomes de coluna)
-const ALLOWED_UPDATE_FIELDS = ['nome', 'email', 'senha'] as const;
+const ALLOWED_UPDATE_FIELDS = ['nome', 'email', 'senha', 'ativo', 'unidade_id'] as const;
 
 export class UsuarioModel {
     static async buscarPorEmail(email: string): Promise<IUsuario | null> {
@@ -19,22 +19,23 @@ export class UsuarioModel {
 
     static async listarTodos(): Promise<IUsuario[]> {
         const [linhas] = await db.execute<RowDataPacket[]>(
-            'SELECT id, nome, email, is_admin, created_at FROM usuarios'
+            'SELECT id, nome, email, is_admin, ativo, unidade_id, created_at FROM usuarios'
         );
         return linhas as IUsuario[];
     }
 
     static async criar(usuario: IUsuario): Promise<number> {
         const [resultado] = await db.execute<ResultSetHeader>(
-            'INSERT INTO usuarios (nome, email, senha, is_admin) VALUES (?, ?, ?, ?)',
-            [usuario.nome, usuario.email, usuario.senha ?? null, usuario.is_admin ?? false]
+            'INSERT INTO usuarios (nome, email, senha, is_admin, ativo, unidade_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [usuario.nome, usuario.email, usuario.senha ?? null, usuario.is_admin ?? false, usuario.ativo ?? true, usuario.unidade_id ?? null]
         );
         return resultado.insertId;
     }
 
-    static async deletar(id: number): Promise<boolean> {
+    static async desativar(id: number): Promise<boolean> {
+        // We do a soft delete instead of hard delete
         const [resultado] = await db.execute<ResultSetHeader>(
-            'DELETE FROM usuarios WHERE id = ?',
+            'UPDATE usuarios SET ativo = false WHERE id = ?',
             [id]
         );
         return resultado.affectedRows > 0;
