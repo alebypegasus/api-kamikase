@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, LayoutGrid, X, Cpu, DollarSign, Eye, Download, FileSpreadsheet, TrendingUp } from 'lucide-react';
+import { 
+  ShoppingBag, Tag, Package, LogOut, Plus, Edit, Trash2, X, Store, 
+  DollarSign, Eye, Download, FileSpreadsheet, TrendingUp, 
+  Star, PhoneCall, HeartHandshake, UserCheck, MessageCircle, 
+  Clock, AlertTriangle 
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -36,6 +41,8 @@ interface VendaDetalheItem {
 interface VendaDetalhe {
   id: number;
   usuarios_id: number;
+  cliente_identificado?: string;
+  cliente_telefone?: string;
   valor_total: number;
   desconto?: number;
   forma_pagamento?: string;
@@ -50,7 +57,7 @@ export default function SystemDashboard() {
   const { confirm } = useConfirm();
   const { addToast } = useToast();
 
-  const [view, setView] = useState<'dashboard' | 'produtos' | 'categorias'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'produtos' | 'categorias' | 'pos-venda'>('dashboard');
   const [loading, setLoading] = useState(true);
   
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -63,6 +70,18 @@ export default function SystemDashboard() {
   const [searchProdutos, setSearchProdutos] = useState('');
   const [vendasPage, setVendasPage] = useState(1);
   const vendasPerPage = 10;
+
+  // Pós-Venda states
+  const [posVendas, setPosVendas] = useState<any[]>([]);
+  const [posVendaStats, setPosVendaStats] = useState<any>({ total: 0, pendentes: 0, contatados: 0, satisfeitos: 0, trocas_garantias: 0, concluidos: 0 });
+  const [posVendaStatusFilter, setPosVendaStatusFilter] = useState('todos');
+  const [posVendaSearch, setPosVendaSearch] = useState('');
+  const [editPosVendaModalOpen, setEditPosVendaModalOpen] = useState(false);
+  const [selectedPosVenda, setSelectedPosVenda] = useState<any | null>(null);
+  const [editPosVendaStatus, setEditPosVendaStatus] = useState('Pendente');
+  const [editPosVendaObs, setEditPosVendaObs] = useState('');
+  const [editPosVendaSatisfacao, setEditPosVendaSatisfacao] = useState<number | null>(5);
+  const [savingPosVenda, setSavingPosVenda] = useState(false);
 
   // Modals state
   const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
@@ -86,13 +105,89 @@ export default function SystemDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
-      await Promise.all([fetchCategorias(), fetchProdutos(), fetchStats(), fetchVendas()]);
+      await Promise.all([fetchCategorias(), fetchProdutos(), fetchStats(), fetchVendas(), fetchPosVendas(), fetchPosVendaStats()]);
       setLoading(false);
     };
     fetchAll();
-    document.body.classList.add('dark-dashboard');
-    return () => document.body.classList.remove('dark-dashboard');
   }, []);
+
+  useEffect(() => {
+    if (view === 'pos-venda') {
+      fetchPosVendas();
+    }
+  }, [posVendaStatusFilter, posVendaSearch, view]);
+
+  const fetchPosVendas = async () => {
+    try {
+      const params: any = {};
+      if (posVendaStatusFilter !== 'todos') params.status = posVendaStatusFilter;
+      if (posVendaSearch.trim()) params.q = posVendaSearch.trim();
+      const res = await api.get('/pos-venda', { params });
+      setPosVendas(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar pós-vendas:', err);
+    }
+  };
+
+  const fetchPosVendaStats = async () => {
+    try {
+      const res = await api.get('/pos-venda/stats');
+      setPosVendaStats(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar stats de pós-venda:', err);
+    }
+  };
+
+  const openEditPosVenda = (item: any) => {
+    setSelectedPosVenda(item);
+    setEditPosVendaStatus(item.status || 'Pendente');
+    setEditPosVendaObs(item.observacoes || '');
+    setEditPosVendaSatisfacao(item.satisfacao || 5);
+    setEditPosVendaModalOpen(true);
+  };
+
+  const handleUpdatePosVenda = async () => {
+    if (!selectedPosVenda) return;
+    setSavingPosVenda(true);
+    try {
+      await api.put(`/pos-venda/${selectedPosVenda.id}`, {
+        status: editPosVendaStatus,
+        observacoes: editPosVendaObs,
+        satisfacao: editPosVendaSatisfacao
+      });
+      addToast('success', 'Registro de pós-venda atualizado com sucesso!');
+      setEditPosVendaModalOpen(false);
+      fetchPosVendas();
+      fetchPosVendaStats();
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Erro ao atualizar pós-venda.');
+    } finally {
+      setSavingPosVenda(false);
+    }
+  };
+
+  const handleQuickStatusChange = async (id: number, newStatus: string) => {
+    try {
+      await api.put(`/pos-venda/${id}`, { status: newStatus });
+      addToast('success', `Status alterado para ${newStatus}!`);
+      fetchPosVendas();
+      fetchPosVendaStats();
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Erro ao alterar status.');
+    }
+  };
+
+  const getWhatsAppLink = (telefone: string, clienteNome: string, vendaId: number) => {
+    if (!telefone) return null;
+    const cleanPhone = telefone.replace(/\D/g, '');
+    const fullPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+    const text = encodeURIComponent(
+      `Olá ${clienteNome}! Aqui é da ${userName}. Agradecemos sua compra #${vendaId}! Tudo correu bem com seus produtos? Estamos à disposição para qualquer suporte ou garantia!`
+    );
+    return `https://wa.me/${fullPhone}?text=${text}`;
+  };
 
   const fetchCategorias = async () => {
     try {
@@ -354,60 +449,91 @@ export default function SystemDashboard() {
   };
 
   return (
-    <div className="sys-container page-transition">
-
-      {/* Sidebar */}
-      <aside className="glass-sidebar">
-        <div className="sidebar-brand" style={{ position: 'relative' }}>
-          <div className="brand-icon" style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))', boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' }}><Cpu size={24} /></div>
-          <span className="sidebar-brand-text neon-text">Kamikase ERP & PDV</span>
+    <div className="sys-container page-transition" style={{ flexDirection: 'column', height: 'auto', minHeight: '100vh' }}>
+      {/* Top Navbar Header */}
+      <header className="app-topbar">
+        <div className="topbar-brand-group">
+          <div className="topbar-logo-icon">
+            <ShoppingBag size={22} />
+          </div>
+          <div>
+            <div className="topbar-brand-title">
+              Kamikase <span>ERP & PDV</span>
+            </div>
+            <div className="topbar-brand-subtitle">
+              Gestão de Estoque & Vendas
+            </div>
+          </div>
         </div>
 
-        <nav className="nav-menu">
-          <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
-            <LayoutGrid size={18} /> <span>Painel Geral</span>
-          </div>
-          <div className={`nav-item ${view === 'produtos' ? 'active' : ''}`} onClick={() => setView('produtos')}>
-            <Package size={18} /> <span>Produtos</span>
-          </div>
-          <div className={`nav-item ${view === 'categorias' ? 'active' : ''}`} onClick={() => setView('categorias')}>
-            <Tag size={18} /> <span>Categorias</span>
-          </div>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <button className="btn-gradient" style={{ width: '100%', justifyContent: 'center' }} onClick={() => navigate('/pdv')}>
-            <ShoppingBag size={18} /> Ir para PDV
+        {/* Central Nav Pills */}
+        <div className="topbar-nav-pills">
+          <button 
+            className="topbar-pill" 
+            onClick={() => navigate('/pdv')} 
+            title="Ir para Frente de Caixa (PDV)"
+          >
+            <Store size={15} />
+            <span>Frente de Caixa (PDV)</span>
           </button>
+          <button 
+            className={`topbar-pill ${view === 'dashboard' ? 'active' : ''}`} 
+            onClick={() => setView('dashboard')}
+          >
+            <TrendingUp size={15} />
+            <span>Painel Geral</span>
+          </button>
+          <button 
+            className={`topbar-pill ${view === 'produtos' ? 'active' : ''}`} 
+            onClick={() => setView('produtos')}
+          >
+            <Package size={15} />
+            <span>Produtos ({totalProdutos})</span>
+          </button>
+          <button 
+            className={`topbar-pill ${view === 'categorias' ? 'active' : ''}`} 
+            onClick={() => setView('categorias')}
+          >
+            <Tag size={15} />
+            <span>Categorias ({totalCategorias})</span>
+          </button>
+          <button 
+            className={`topbar-pill ${view === 'pos-venda' ? 'active' : ''}`} 
+            onClick={() => setView('pos-venda')}
+          >
+            <HeartHandshake size={15} />
+            <span>Pós-Venda ({posVendaStats.total || 0})</span>
+          </button>
+        </div>
 
-          <div className="sidebar-user-card">
-            <div className="sidebar-user-avatar">
-              {userName?.charAt(0)}
+        {/* Right Section */}
+        <div className="topbar-actions-group">
+          <ThemeToggle />
+
+          <div className="topbar-divider" />
+
+          <div className="topbar-user-capsule">
+            <div className="topbar-user-avatar">
+              {userName?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{userName}</div>
-              <div className="sidebar-user-role">{isAdmin ? 'Administrador' : 'Lojista'}</div>
+            <div className="topbar-user-meta">
+              <span className="topbar-user-name">{userName}</span>
+              <span className="topbar-user-role">{isAdmin ? 'Administrador' : 'Lojista'}</span>
             </div>
-            <button onClick={handleLogout} className="btn-icon danger" style={{ border: 'none', background: 'transparent' }} title="Sair">
-              <LogOut size={18} />
+            <button 
+              onClick={handleLogout} 
+              className="topbar-logout-btn" 
+              title="Encerrar Sessão"
+            >
+              <LogOut size={15} />
+              <span>Sair</span>
             </button>
           </div>
         </div>
-      </aside>
+      </header>
 
       {/* Main Content */}
-      <main className="sys-main-content">
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {view === 'dashboard' && <><TrendingUp size={22} style={{ color: 'var(--primary)' }} /> Visão Geral do Negócio</>}
-              {view === 'produtos' && <><Package size={22} style={{ color: 'var(--primary)' }} /> Catálogo de Produtos</>}
-              {view === 'categorias' && <><Tag size={22} style={{ color: 'var(--primary)' }} /> Gestão de Categorias</>}
-            </h1>
-            <p>Gerencie seu inventário e acompanhe resultados comerciais.</p>
-          </div>
-          <ThemeToggle />
-        </div>
+      <main className="sys-main-content" style={{ maxWidth: '1440px', width: '100%', margin: '0 auto' }}>
 
         {view === 'dashboard' && (
           <div className="view-transition">
@@ -479,48 +605,61 @@ export default function SystemDashboard() {
               {loading ? (
                 <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={4} /></div>
               ) : (
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Valor Total</th>
-                      <th>Pagamento</th>
-                      <th>Data</th>
-                      <th style={{ textAlign: 'right' }}>Detalhes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedVendas.length > 0 ? paginatedVendas.map(v => (
-                      <tr key={v.id}>
-                        <td style={{ color: 'var(--text-muted)' }}>#{v.id}</td>
-                        <td className="price-text">R$ {Number(v.valor_total).toFixed(2)}</td>
-                        <td>
-                          <span style={{ 
-                            fontSize: '12px', 
-                            padding: '3px 8px', 
-                            borderRadius: '6px', 
-                            background: 'rgba(255,255,255,0.06)',
-                            color: '#e2e8f0'
-                          }}>
-                            {v.forma_pagamento || 'Dinheiro'}
-                          </span>
-                        </td>
-                        <td>{new Date(v.created_at).toLocaleString('pt-BR')}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button 
-                            className="btn-icon" 
-                            onClick={() => abrirDetalhesVenda(v.id)}
-                            title="Ver Itens da Venda"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </td>
+                <div className="table-responsive">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Valor Total</th>
+                        <th>Pagamento</th>
+                        <th>Data</th>
+                        <th style={{ textAlign: 'right' }}>Detalhes</th>
                       </tr>
-                    )) : (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma venda registrada.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {paginatedVendas.length > 0 ? paginatedVendas.map(v => (
+                        <tr key={v.id}>
+                          <td style={{ color: 'var(--text-muted)' }}>#{v.id}</td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: 'var(--text-bright)' }}>
+                              {v.cliente_identificado || 'Consumidor Final'}
+                            </div>
+                            {v.cliente_telefone && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                {v.cliente_telefone}
+                              </span>
+                            )}
+                          </td>
+                          <td className="price-text">R$ {Number(v.valor_total).toFixed(2)}</td>
+                          <td>
+                            <span style={{ 
+                              fontSize: '12px', 
+                              padding: '3px 8px', 
+                              borderRadius: '6px', 
+                              background: 'rgba(255,255,255,0.06)',
+                              color: '#e2e8f0'
+                            }}>
+                              {v.forma_pagamento || 'Dinheiro'}
+                            </span>
+                          </td>
+                          <td>{new Date(v.created_at).toLocaleString('pt-BR')}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button 
+                              className="btn-icon" 
+                              onClick={() => abrirDetalhesVenda(v.id)}
+                              title="Ver Itens da Venda"
+                            >
+                              <Eye size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma venda registrada.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -556,46 +695,48 @@ export default function SystemDashboard() {
               {loading ? (
                 <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={4} /></div>
               ) : (
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th>Nome</th>
-                      <th>Preço</th>
-                      <th>Estoque</th>
-                      <th style={{ textAlign: 'right' }}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProdutos.length > 0 ? filteredProdutos.map(p => {
-                      const stockBadge = getStockBadge(p.estoque);
-                      return (
-                        <tr key={p.id}>
-                          <td style={{ fontWeight: 500 }}>{p.nome}</td>
-                          <td className="price-text">R$ {Number(p.preco).toFixed(2)}</td>
-                          <td>
-                            <span className={`badge-stock ${stockBadge.className}`}>
-                              {stockBadge.label}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="actions-cell">
-                              <button className="btn-icon" onClick={() => openEditProduto(p)}>
-                                <Edit size={16} />
-                              </button>
-                              <button className="btn-icon danger" onClick={() => deleteProduto(p.id)}>
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }) : (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
-                        {searchProdutos ? `Nenhum produto encontrado para "${searchProdutos}".` : 'Nenhum produto cadastrado.'}
-                      </td></tr>
-                    )}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Nome</th>
+                        <th>Preço</th>
+                        <th>Estoque</th>
+                        <th style={{ textAlign: 'right' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredProdutos.length > 0 ? filteredProdutos.map(p => {
+                        const stockBadge = getStockBadge(p.estoque);
+                        return (
+                          <tr key={p.id}>
+                            <td style={{ fontWeight: 500 }}>{p.nome}</td>
+                            <td className="price-text">R$ {Number(p.preco).toFixed(2)}</td>
+                            <td>
+                              <span className={`badge-stock ${stockBadge.className}`}>
+                                {stockBadge.label}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="actions-cell">
+                                <button className="btn-icon" onClick={() => openEditProduto(p)}>
+                                  <Edit size={16} />
+                                </button>
+                                <button className="btn-icon danger" onClick={() => deleteProduto(p.id)}>
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                          {searchProdutos ? `Nenhum produto encontrado para "${searchProdutos}".` : 'Nenhum produto cadastrado.'}
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -613,41 +754,288 @@ export default function SystemDashboard() {
               {loading ? (
                 <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={3} /></div>
               ) : (
-                <table className="custom-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Nome (Hierarquia)</th>
-                      <th style={{ textAlign: 'right' }}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categorias.length > 0 ? categorias.map(c => {
-                      const parent = categorias.find(p => p.id === c.parent_id);
-                      return (
-                      <tr key={c.id}>
-                        <td style={{ color: 'var(--text-muted)' }}>#{c.id}</td>
-                        <td>
-                          <span className="badge-cat">
-                            {parent ? `${parent.nome} > ${c.nome}` : c.nome}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="actions-cell">
-                            <button className="btn-icon" onClick={() => openEditCategoria(c)}>
-                              <Edit size={16} />
-                            </button>
-                            <button className="btn-icon danger" onClick={() => deleteCategoria(c.id)}>
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
+                <div className="table-responsive">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Nome (Hierarquia)</th>
+                        <th style={{ textAlign: 'right' }}>Ações</th>
                       </tr>
-                    )}) : (
-                      <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma categoria cadastrada.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {categorias.length > 0 ? categorias.map(c => {
+                        const parent = categorias.find(p => p.id === c.parent_id);
+                        return (
+                        <tr key={c.id}>
+                          <td style={{ color: 'var(--text-muted)' }}>#{c.id}</td>
+                          <td>
+                            <span className="badge-cat">
+                              {parent ? `${parent.nome} > ${c.nome}` : c.nome}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="actions-cell">
+                              <button className="btn-icon" onClick={() => openEditCategoria(c)}>
+                                <Edit size={16} />
+                              </button>
+                              <button className="btn-icon danger" onClick={() => deleteCategoria(c.id)}>
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}) : (
+                        <tr><td colSpan={3} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Nenhuma categoria cadastrada.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === 'pos-venda' && (
+          <div className="view-transition">
+            {/* Header da aba */}
+            <div className="page-header" style={{ marginBottom: '24px' }}>
+              <div>
+                <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <HeartHandshake size={24} style={{ color: 'var(--primary)' }} />
+                  Acompanhamento de Pós-Venda & Fidelização
+                </h1>
+                <p>Relacionamento pós-compra, satisfação do cliente, follow-up e controle de trocas e garantias.</p>
+              </div>
+            </div>
+
+            {/* Metric Cards de Pós-Venda */}
+            <div className="posvenda-stat-grid">
+              <div className="stat-card hover-lift animate-slide-up">
+                <div>
+                  <div className="stat-card-label">Total Atendimentos</div>
+                  <div className="stat-card-value"><AnimatedCounter value={posVendaStats.total || 0} /></div>
+                </div>
+                <div className="stat-icon purple"><UserCheck size={26} /></div>
+              </div>
+
+              <div className="stat-card hover-lift animate-slide-up" style={{ borderLeft: '3px solid var(--warning)' }}>
+                <div>
+                  <div className="stat-card-label">Follow-up Pendente</div>
+                  <div className="stat-card-value" style={{ color: 'var(--warning)' }}>
+                    <AnimatedCounter value={posVendaStats.pendentes || 0} />
+                  </div>
+                </div>
+                <div className="stat-icon amber"><Clock size={26} /></div>
+              </div>
+
+              <div className="stat-card hover-lift animate-slide-up">
+                <div>
+                  <div className="stat-card-label">Clientes Contatados</div>
+                  <div className="stat-card-value" style={{ color: 'var(--info)' }}>
+                    <AnimatedCounter value={posVendaStats.contatados || 0} />
+                  </div>
+                </div>
+                <div className="stat-icon cyan"><PhoneCall size={26} /></div>
+              </div>
+
+              <div className="stat-card hover-lift animate-slide-up" style={{ borderLeft: '3px solid var(--accent)' }}>
+                <div>
+                  <div className="stat-card-label">Clientes Satisfeitos</div>
+                  <div className="stat-card-value" style={{ color: 'var(--accent)' }}>
+                    <AnimatedCounter value={posVendaStats.satisfeitos || 0} />
+                  </div>
+                </div>
+                <div className="stat-icon teal"><Star size={26} /></div>
+              </div>
+
+              <div className="stat-card hover-lift animate-slide-up">
+                <div>
+                  <div className="stat-card-label">Trocas & Garantia</div>
+                  <div className="stat-card-value" style={{ color: 'var(--danger)' }}>
+                    <AnimatedCounter value={posVendaStats.trocas_garantias || 0} />
+                  </div>
+                </div>
+                <div className="stat-icon pink"><AlertTriangle size={26} /></div>
+              </div>
+            </div>
+
+            {/* Filter Bar & Search */}
+            <div className="posvenda-filter-bar">
+              <div className="posvenda-filter-pills">
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'todos' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('todos')}
+                >
+                  Todos ({posVendaStats.total || 0})
+                </button>
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'Pendente' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('Pendente')}
+                >
+                  ⏳ Pendentes ({posVendaStats.pendentes || 0})
+                </button>
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'Contatado' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('Contatado')}
+                >
+                  📞 Contatados ({posVendaStats.contatados || 0})
+                </button>
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'Satisfeito' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('Satisfeito')}
+                >
+                  ⭐ Satisfeitos ({posVendaStats.satisfeitos || 0})
+                </button>
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'Troca/Garantia' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('Troca/Garantia')}
+                >
+                  🔄 Troca/Garantia ({posVendaStats.trocas_garantias || 0})
+                </button>
+                <button 
+                  className={`posvenda-status-pill ${posVendaStatusFilter === 'Concluido' ? 'active' : ''}`}
+                  onClick={() => setPosVendaStatusFilter('Concluido')}
+                >
+                  ✅ Concluídos ({posVendaStats.concluidos || 0})
+                </button>
+              </div>
+
+              <div style={{ minWidth: '280px' }}>
+                <SearchInput 
+                  value={posVendaSearch} 
+                  onChange={setPosVendaSearch} 
+                  placeholder="Buscar cliente, telefone ou nota..."
+                />
+              </div>
+            </div>
+
+            {/* Tabela de Acompanhamentos */}
+            <div className="content-panel">
+              <div className="panel-header">
+                <h2>Registros de Pós-Venda ({posVendas.length})</h2>
+              </div>
+
+              {loading ? (
+                <div style={{ padding: '24px' }}><SkeletonTable rows={5} cols={6} /></div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Cliente & Contato</th>
+                        <th>Venda / Data</th>
+                        <th>Itens Comprados</th>
+                        <th>Status Pós-Venda</th>
+                        <th>Satisfação</th>
+                        <th>Anotações de Atendimento</th>
+                        <th style={{ textAlign: 'right' }}>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {posVendas.length > 0 ? posVendas.map(pv => {
+                        const waLink = getWhatsAppLink(pv.cliente_telefone, pv.cliente_nome, pv.vendas_id);
+                        return (
+                          <tr key={pv.id}>
+                            <td>
+                              <div style={{ fontWeight: 700, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {pv.cliente_nome}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                                  {pv.cliente_telefone || 'Sem telefone'}
+                                </span>
+                                {waLink && (
+                                  <a 
+                                    href={waLink} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="btn-whatsapp" 
+                                    title="Iniciar conversa no WhatsApp"
+                                  >
+                                    <MessageCircle size={13} /> WhatsApp
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>
+                                R$ {Number(pv.venda_valor).toFixed(2)}
+                              </div>
+                              <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                                Venda #{pv.vendas_id} • {new Date(pv.venda_data).toLocaleDateString('pt-BR')}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ maxWidth: '240px', fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                                {pv.itens_resumo || `${pv.total_itens || 1} itens`}
+                              </div>
+                            </td>
+                            <td>
+                              <select 
+                                className="custom-input"
+                                value={pv.status}
+                                onChange={e => handleQuickStatusChange(pv.id, e.target.value)}
+                                style={{ 
+                                  padding: '6px 10px', 
+                                  fontSize: '12px', 
+                                  fontWeight: 700,
+                                  borderRadius: 'var(--radius-full)',
+                                  border: '1px solid var(--border-light)',
+                                  background: 'var(--bg-surface)'
+                                }}
+                              >
+                                <option value="Pendente">⏳ Pendente</option>
+                                <option value="Contatado">📞 Contatado</option>
+                                <option value="Satisfeito">⭐ Satisfeito</option>
+                                <option value="Troca/Garantia">🔄 Troca/Garantia</option>
+                                <option value="Concluido">✅ Concluído</option>
+                              </select>
+                            </td>
+                            <td>
+                              {pv.satisfacao ? (
+                                <div style={{ color: '#f59e0b', fontSize: '14px', letterSpacing: '1px' }}>
+                                  {'★'.repeat(pv.satisfacao)}{'☆'.repeat(5 - pv.satisfacao)}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Não avaliado</span>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ maxWidth: '260px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: pv.observacoes ? 'normal' : 'italic' }}>
+                                {pv.observacoes || 'Sem anotações de atendimento.'}
+                              </div>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <div className="actions-cell" style={{ justifyContent: 'flex-end' }}>
+                                <button 
+                                  className="btn-icon" 
+                                  onClick={() => openEditPosVenda(pv)}
+                                  title="Editar Nota / Satisfação"
+                                >
+                                  <Edit size={15} />
+                                </button>
+                                <button 
+                                  className="btn-icon" 
+                                  onClick={() => abrirDetalhesVenda(pv.vendas_id)}
+                                  title="Ver Detalhes da Venda"
+                                >
+                                  <Eye size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
+                            Nenhum registro de pós-venda encontrado para este filtro.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -674,6 +1062,17 @@ export default function SystemDashboard() {
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
                   <div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Cliente</span>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-bright)' }}>
+                      {vendaDetalhe.cliente_identificado || 'Consumidor Final'}
+                    </span>
+                    {vendaDetalhe.cliente_telefone && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>
+                        Tel: {vendaDetalhe.cliente_telefone}
+                      </span>
+                    )}
+                  </div>
+                  <div>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Data</span>
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>{new Date(vendaDetalhe.created_at).toLocaleString('pt-BR')}</span>
                   </div>
@@ -681,12 +1080,6 @@ export default function SystemDashboard() {
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Forma de Pagamento</span>
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>{vendaDetalhe.forma_pagamento || 'Dinheiro'} {vendaDetalhe.parcelas && vendaDetalhe.parcelas > 1 ? `(${vendaDetalhe.parcelas}x)` : ''}</span>
                   </div>
-                  {Number(vendaDetalhe.desconto || 0) > 0 && (
-                    <div>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Desconto Aplicado</span>
-                      <span style={{ fontSize: '14px', color: '#2dd4bf', fontWeight: 600 }}>- R$ {Number(vendaDetalhe.desconto).toFixed(2)}</span>
-                    </div>
-                  )}
                   <div>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Valor Total</span>
                     <span style={{ fontSize: '18px', color: '#2dd4bf', fontWeight: 700 }}>R$ {Number(vendaDetalhe.valor_total).toFixed(2)}</span>
@@ -812,6 +1205,108 @@ export default function SystemDashboard() {
                 {selectedProduto ? 'Salvar Alterações' : 'Criar Produto'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Editar Registro de Pós-Venda Modal */}
+      {editPosVendaModalOpen && selectedPosVenda && (
+        <div className="glass-modal" onClick={() => setEditPosVendaModalOpen(false)}>
+          <div className="modal-content-glass" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Atendimento Pós-Venda</h3>
+              <button onClick={() => setEditPosVendaModalOpen(false)} className="modal-close"><X size={20} /></button>
+            </div>
+
+            <div style={{ background: 'var(--bg-surface)', padding: '14px', borderRadius: '8px', marginBottom: '16px' }}>
+              <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-bright)' }}>
+                {selectedPosVenda.cliente_nome}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Venda #{selectedPosVenda.vendas_id} • R$ {Number(selectedPosVenda.venda_valor).toFixed(2)}
+                {selectedPosVenda.cliente_telefone ? ` • Tel: ${selectedPosVenda.cliente_telefone}` : ''}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  Status do Pós-Venda
+                </label>
+                <select 
+                  className="custom-input"
+                  value={editPosVendaStatus}
+                  onChange={e => setEditPosVendaStatus(e.target.value)}
+                >
+                  <option value="Pendente">⏳ Pendente (Aguardando contato de rotina)</option>
+                  <option value="Contatado">📞 Contatado (Cliente respondeu/em andamento)</option>
+                  <option value="Satisfeito">⭐ Satisfeito (Feedback positivo recebido)</option>
+                  <option value="Troca/Garantia">🔄 Troca/Garantia (Solicitação aberta)</option>
+                  <option value="Concluido">✅ Concluído (Caso encerrado com sucesso)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  Nível de Satisfação do Cliente (1 a 5 Estrelas)
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button 
+                      key={star}
+                      type="button"
+                      onClick={() => setEditPosVendaSatisfacao(star)}
+                      style={{ 
+                        fontSize: '24px', 
+                        background: 'transparent', 
+                        border: 'none', 
+                        cursor: 'pointer',
+                        color: (editPosVendaSatisfacao || 0) >= star ? '#f59e0b' : 'var(--border-lighter)'
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-main)', marginLeft: '6px' }}>
+                    {editPosVendaSatisfacao ? `${editPosVendaSatisfacao} de 5 estrelas` : 'Não avaliado'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  Anotações de Atendimento & Histórico
+                </label>
+                <textarea 
+                  className="custom-input"
+                  rows={4}
+                  placeholder="Ex: Cliente elogiou o produto, tudo funcionando perfeito. Perguntou sobre garantia..."
+                  value={editPosVendaObs}
+                  onChange={e => setEditPosVendaObs(e.target.value)}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditPosVendaModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button"
+                  className="btn-primary"
+                  style={{ flex: 1 }}
+                  disabled={savingPosVenda}
+                  onClick={handleUpdatePosVenda}
+                >
+                  {savingPosVenda ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

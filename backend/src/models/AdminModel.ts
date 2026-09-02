@@ -97,6 +97,10 @@ export class AdminModel {
                 v.forma_pagamento,
                 v.parcelas,
                 v.created_at,
+                v.cliente_id,
+                COALESCE(v.cliente_nome, c.nome) as cliente_identificado,
+                c.nome as cliente_cadastrado_nome,
+                c.telefone as cliente_telefone,
                 u.nome as lojista_nome,
                 u.email as lojista_email,
                 un.nome as unidade_nome,
@@ -104,6 +108,7 @@ export class AdminModel {
             FROM vendas v
             JOIN usuarios u ON v.usuarios_id = u.id
             LEFT JOIN unidades un ON u.unidade_id = un.id
+            LEFT JOIN clientes c ON v.cliente_id = c.id
             ORDER BY v.created_at DESC
         `;
         const [linhas] = await db.execute<RowDataPacket[]>(query);
@@ -112,10 +117,19 @@ export class AdminModel {
 
     static async obterDetalhesVendaGlobal(vendaId: number) {
         const [vendaRows] = await db.execute<RowDataPacket[]>(
-            `SELECT v.*, u.nome as lojista_nome, u.email as lojista_email, un.nome as unidade_nome 
+            `SELECT v.*, 
+                    COALESCE(v.cliente_nome, c.nome) as cliente_identificado,
+                    c.nome as cliente_cadastrado_nome,
+                    c.telefone as cliente_telefone,
+                    c.cpf_cnpj as cliente_cpf,
+                    c.email as cliente_email,
+                    u.nome as lojista_nome, 
+                    u.email as lojista_email, 
+                    un.nome as unidade_nome 
              FROM vendas v 
              JOIN usuarios u ON v.usuarios_id = u.id 
              LEFT JOIN unidades un ON u.unidade_id = un.id 
+             LEFT JOIN clientes c ON v.cliente_id = c.id
              WHERE v.id = ?`,
             [vendaId]
         );

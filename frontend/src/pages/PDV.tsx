@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ShoppingBag, LogOut, CheckCircle, Layers, X, ChevronRight, Cpu, Monitor, Zap, Server, Plus, Printer, Receipt, Sparkles } from 'lucide-react';
+import { ShoppingBag, LogOut, CheckCircle, X, ChevronRight, Store, LayoutDashboard, Plus, Printer, Receipt, Sparkles, Server, Monitor, Zap, Layers, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,8 @@ interface ReceiptData {
   parcelas: number;
   data: string;
   operador: string;
+  cliente?: string;
+  telefone?: string;
 }
 
 export default function PDV() {
@@ -67,6 +69,19 @@ export default function PDV() {
   const [parcelas, setParcelas] = useState<number>(1);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
+
+  // Client identification states
+  const [clientMode, setClientMode] = useState<'none' | 'quick' | 'register'>('none');
+  const [clienteNome, setClienteNome] = useState('');
+  const [selectedClienteId, setSelectedClienteId] = useState<number | null>(null);
+  const [clientesList, setClientesList] = useState<any[]>([]);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientNome, setNewClientNome] = useState('');
+  const [newClientCpf, setNewClientCpf] = useState('');
+  const [newClientTelefone, setNewClientTelefone] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [savingClient, setSavingClient] = useState(false);
 
   // Clock
   const [clock, setClock] = useState('');
@@ -76,13 +91,10 @@ export default function PDV() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      await Promise.all([fetchCategorias(), fetchProdutos()]);
+      await Promise.all([fetchCategorias(), fetchProdutos(), fetchClientes()]);
       setLoading(false);
     };
     fetchData();
-
-    document.body.classList.add('dark-pdv');
-    return () => document.body.classList.remove('dark-pdv');
   }, []);
 
   // Clock update
@@ -127,6 +139,44 @@ export default function PDV() {
       const res = await api.get('/produtos');
       setProdutos(res.data);
     } catch (err) { console.error(err); }
+  };
+
+  const fetchClientes = async () => {
+    try {
+      const res = await api.get('/clientes');
+      setClientesList(res.data);
+    } catch (err) { console.error('Erro ao buscar clientes:', err); }
+  };
+
+  const handleSaveNewClient = async () => {
+    if (!newClientNome.trim()) {
+      showNotification('Digite ao menos o nome completo do cliente.');
+      return;
+    }
+    setSavingClient(true);
+    try {
+      const res = await api.post('/clientes', {
+        nome: newClientNome.trim(),
+        cpf_cnpj: newClientCpf.trim() || null,
+        telefone: newClientTelefone.trim() || null,
+        email: newClientEmail.trim() || null
+      });
+      const novo = res.data.cliente;
+      setClientesList(prev => [...prev, novo]);
+      setSelectedClienteId(novo.id);
+      setClienteNome(novo.nome);
+      setShowNewClientForm(false);
+      setNewClientNome('');
+      setNewClientCpf('');
+      setNewClientTelefone('');
+      setNewClientEmail('');
+      showNotification('Cliente cadastrado com sucesso!');
+    } catch (err: any) {
+      const msg = err.response?.data?.erro || 'Erro ao cadastrar cliente.';
+      showNotification(msg);
+    } finally {
+      setSavingClient(false);
+    }
   };
 
   const addToCart = useCallback((produto: Produto) => {
@@ -195,16 +245,35 @@ export default function PDV() {
       preco_unitario: item.preco
     }));
 
+    // Determine client info based on mode
+    let finalClienteNome: string | null = null;
+    let finalClienteId: number | null = null;
+
+    if (clientMode === 'quick') {
+      finalClienteNome = clienteNome.trim() || null;
+    } else if (clientMode === 'register') {
+      finalClienteId = selectedClienteId || null;
+      if (selectedClienteId) {
+        const found = clientesList.find(c => c.id === selectedClienteId);
+        finalClienteNome = found ? found.nome : (clienteNome.trim() || null);
+      } else if (clienteNome.trim()) {
+        finalClienteNome = clienteNome.trim();
+      }
+    }
+
     try {
       const res = await api.post('/vendas', { 
         valor_total: finalTotal, 
         itens,
         desconto: descontoAmount,
         forma_pagamento: formaPagamento,
-        parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1
+        parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1,
+        cliente_id: finalClienteId,
+        cliente_nome: finalClienteNome
       });
 
       const vendaId = res.data.id || Date.now();
+      const selectedClientObj = finalClienteId ? clientesList.find(c => c.id === finalClienteId) : null;
 
       // Set receipt data for the receipt modal
       setReceiptData({
@@ -218,11 +287,19 @@ export default function PDV() {
         formaPagamento,
         parcelas: formaPagamento === 'Cartão de Crédito' ? parcelas : 1,
         data: new Date().toLocaleString('pt-BR'),
-        operador: userName || 'Caixa'
+        operador: userName || 'Caixa',
+        cliente: finalClienteNome || 'Consumidor Final',
+        telefone: selectedClientObj?.telefone || undefined
       });
 
       setCart([]);
       setIsCheckoutModalOpen(false);
+
+      // Reset client selection states
+      setClientMode('none');
+      setClienteNome('');
+      setSelectedClienteId(null);
+      setShowNewClientForm(false);
 
       // Trigger confetti celebration & success sound
       setShowCelebration(true);
@@ -308,35 +385,61 @@ export default function PDV() {
   return (
     <div className="pdv-premium-container page-transition">
       {/* Top Navbar */}
-      <header className="glass-panel pdv-header">
-        <div className="pdv-header-left">
-          <div className="pdv-logo-icon">
-            <Cpu size={24} color="white" />
+      <header className="app-topbar">
+        <div className="topbar-brand-group">
+          <div className="topbar-logo-icon">
+            <ShoppingBag size={22} />
           </div>
-          <h2 className="pdv-brand neon-text">
-            Kamikase ERP & PDV
-          </h2>
+          <div>
+            <div className="topbar-brand-title">
+              Kamikase <span>ERP & PDV</span>
+            </div>
+            <div className="topbar-brand-subtitle">
+              Frente de Caixa
+            </div>
+          </div>
         </div>
-        
-        <div className="pdv-header-right">
-          <span className="pdv-clock">{clock}</span>
+
+        {/* Central Switch: PDV vs Gestão */}
+        <div className="topbar-nav-pills">
+          <button className="topbar-pill active" title="Frente de Caixa (PDV)">
+            <Store size={15} />
+            <span>Frente de Caixa (PDV)</span>
+          </button>
+          <button className="topbar-pill" onClick={() => navigate('/system')} title="Ir para Gestão de Produtos & Estoque">
+            <LayoutDashboard size={15} />
+            <span>Gestão de Estoque</span>
+          </button>
+        </div>
+
+        {/* Right Section: Status, Theme & User */}
+        <div className="topbar-actions-group">
+          <div className="topbar-status-badge">
+            <span className="status-indicator-dot" />
+            <span className="status-clock">{clock}</span>
+          </div>
+
+          <div className="topbar-divider" />
 
           <ThemeToggle />
 
-          <button className="pdv-nav-btn" onClick={() => navigate('/system')}>
-            <Layers size={16} /> <span>Sistema</span>
-            <span className="kbd-hint">Alt+S</span>
-          </button>
-          
-          <div className="pdv-divider" />
+          <div className="topbar-divider" />
 
-          <div className="pdv-user-info">
-            <div className="pdv-user-details">
-              <div className="pdv-user-name">{userName}</div>
-              <div className="pdv-user-status">Caixa Aberto</div>
+          <div className="topbar-user-capsule">
+            <div className="topbar-user-avatar">
+              {userName?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <button onClick={handleLogout} className="pdv-nav-btn" style={{ padding: '8px', color: '#ef4444' }} title="Sair">
-              <LogOut size={18} />
+            <div className="topbar-user-meta">
+              <span className="topbar-user-name">{userName}</span>
+              <span className="topbar-user-role">Operador</span>
+            </div>
+            <button 
+              onClick={handleLogout} 
+              className="topbar-logout-btn" 
+              title="Encerrar Sessão"
+            >
+              <LogOut size={15} />
+              <span>Sair</span>
             </button>
           </div>
         </div>
@@ -457,7 +560,7 @@ export default function PDV() {
         </div>
 
         {/* Right Side: Cart Glass Panel */}
-        <div className="glass-panel pdv-cart-sidebar">
+        <div className={`glass-panel pdv-cart-sidebar ${mobileCartOpen ? 'mobile-open' : ''}`}>
           
           <div className="pdv-cart-header">
             <h2>
@@ -477,6 +580,14 @@ export default function PDV() {
                 </span>
               )}
             </h2>
+            <button 
+              type="button" 
+              className="pdv-cart-mobile-close"
+              onClick={() => setMobileCartOpen(false)}
+              title="Fechar Carrinho"
+            >
+              <X size={20} />
+            </button>
           </div>
           
           <div className="pdv-cart-body">
@@ -520,7 +631,10 @@ export default function PDV() {
               className="pdv-btn-gradient" 
               style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
               disabled={cart.length === 0}
-              onClick={() => setIsCheckoutModalOpen(true)}
+              onClick={() => {
+                setMobileCartOpen(false);
+                setIsCheckoutModalOpen(true);
+              }}
             >
               <Sparkles size={18} /> Processar Pagamento <ChevronRight size={20} />
               <span className="kbd-hint" style={{ marginLeft: '4px' }}>F12</span>
@@ -530,10 +644,30 @@ export default function PDV() {
 
       </div>
 
+      {/* Mobile Floating Cart Bar (Visível apenas em dispositivos móveis/tablets quando há itens) */}
+      {cart.length > 0 && !mobileCartOpen && !isCheckoutModalOpen && (
+        <div className="pdv-mobile-cart-bar animate-slide-up">
+          <button 
+            type="button" 
+            className="pdv-mobile-cart-btn"
+            onClick={() => setMobileCartOpen(true)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShoppingBag size={20} />
+              <span>{cartItemCount} {cartItemCount === 1 ? 'item' : 'itens'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 900 }}>R$ {cartTotal.toFixed(2)}</span>
+              <span style={{ fontSize: '13px', opacity: 0.9 }}>Ver Pedido →</span>
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* Checkout Modal */}
       {isCheckoutModalOpen && (
         <div className="glass-modal" onClick={() => setIsCheckoutModalOpen(false)}>
-          <div className="modal-content-glass" style={{ width: '420px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content-glass" style={{ width: '100%', maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
             
             <div className="modal-header" style={{ marginBottom: '32px' }}>
               <h2 className="modal-title">Checkout</h2>
@@ -598,7 +732,148 @@ export default function PDV() {
                 </div>
               )}
 
-              <div style={{ marginTop: '12px', paddingTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              {/* Identificação do Cliente (Opcional) */}
+              <div className="checkout-client-section">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                    <User size={15} color="var(--primary)" /> Identificação do Cliente
+                  </label>
+                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Opcional</span>
+                </div>
+
+                {/* Modo de Identificação */}
+                <div className="client-mode-pills">
+                  <button 
+                    type="button"
+                    className={`client-pill ${clientMode === 'none' ? 'active' : ''}`}
+                    onClick={() => { setClientMode('none'); setClienteNome(''); setSelectedClienteId(null); }}
+                  >
+                    Sem Identificação
+                  </button>
+                  <button 
+                    type="button"
+                    className={`client-pill ${clientMode === 'quick' ? 'active' : ''}`}
+                    onClick={() => { setClientMode('quick'); setSelectedClienteId(null); }}
+                  >
+                    Apenas Nome
+                  </button>
+                  <button 
+                    type="button"
+                    className={`client-pill ${clientMode === 'register' ? 'active' : ''}`}
+                    onClick={() => { setClientMode('register'); }}
+                  >
+                    Cadastrar / Buscar
+                  </button>
+                </div>
+
+                {/* Opção 1: Apenas Nome Completo */}
+                {clientMode === 'quick' && (
+                  <div className="animate-fade-in" style={{ marginTop: '12px' }}>
+                    <input 
+                      type="text"
+                      className="custom-input"
+                      placeholder="Nome completo do cliente..."
+                      value={clienteNome}
+                      onChange={e => setClienteNome(e.target.value)}
+                      autoFocus
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>
+                      Identificação avulsa para o comprovante e pós-venda.
+                    </span>
+                  </div>
+                )}
+
+                {/* Opção 2: Selecionar Cliente Existente ou Cadastrar Novo */}
+                {clientMode === 'register' && (
+                  <div className="animate-fade-in" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select 
+                        className="custom-input"
+                        value={selectedClienteId || ''}
+                        onChange={e => {
+                          const id = e.target.value ? Number(e.target.value) : null;
+                          setSelectedClienteId(id);
+                          if (id) {
+                            const c = clientesList.find(item => item.id === id);
+                            if (c) setClienteNome(c.nome);
+                          } else {
+                            setClienteNome('');
+                          }
+                        }}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">-- Selecionar Cliente Cadastrado --</option>
+                        {clientesList.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome} {c.telefone ? `(${c.telefone})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button 
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setShowNewClientForm(!showNewClientForm)}
+                      >
+                        <Plus size={14} /> {showNewClientForm ? 'Fechar' : 'Novo'}
+                      </button>
+                    </div>
+
+                    {showNewClientForm && (
+                      <div className="new-client-box animate-scale-up">
+                        <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--primary)', marginBottom: '8px' }}>
+                          Cadastrar Novo Cliente
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input 
+                            type="text"
+                            className="custom-input"
+                            placeholder="Nome Completo *"
+                            value={newClientNome}
+                            onChange={e => setNewClientNome(e.target.value)}
+                          />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input 
+                              type="text"
+                              className="custom-input"
+                              placeholder="Telefone / WhatsApp"
+                              value={newClientTelefone}
+                              onChange={e => setNewClientTelefone(e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                            <input 
+                              type="text"
+                              className="custom-input"
+                              placeholder="CPF (opcional)"
+                              value={newClientCpf}
+                              onChange={e => setNewClientCpf(e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                          </div>
+                          <input 
+                            type="email"
+                            className="custom-input"
+                            placeholder="E-mail (opcional)"
+                            value={newClientEmail}
+                            onChange={e => setNewClientEmail(e.target.value)}
+                          />
+                          <button 
+                            type="button"
+                            className="btn-primary"
+                            style={{ padding: '8px 12px', fontSize: '12px', width: '100%', borderRadius: '6px' }}
+                            disabled={savingClient || !newClientNome.trim()}
+                            onClick={handleSaveNewClient}
+                          >
+                            {savingClient ? 'Salvando...' : 'Salvar e Vincular à Venda'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: '4px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
                 {extraFeeAmount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#f87171', fontSize: '14px', marginBottom: '8px' }}>
                     <span>Juros de Parcelamento ({(parcelas - 10) * 5}%)</span>
@@ -626,7 +901,7 @@ export default function PDV() {
       {/* Printable Receipt / Cupom Modal */}
       {receiptData && (
         <div className="glass-modal" onClick={() => setReceiptData(null)}>
-          <div className="modal-content-glass" style={{ width: '450px', background: '#0f172a' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content-glass" style={{ width: '100%', maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Receipt size={22} color="#2dd4bf" />
@@ -654,6 +929,8 @@ export default function PDV() {
                 <p style={{ margin: 0, fontSize: '11px', color: '#555' }}>CUPOM NÃO FISCAL</p>
                 <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#555' }}>Venda #{receiptData.vendaId} • {receiptData.data}</p>
                 <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#555' }}>Operador: {receiptData.operador}</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#111', fontWeight: 'bold' }}>Cliente: {receiptData.cliente || 'Consumidor Final'}</p>
+                {receiptData.telefone && <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: '#555' }}>Tel: {receiptData.telefone}</p>}
               </div>
 
               <div style={{ borderBottom: '1px dashed #666', paddingBottom: '8px', marginBottom: '8px' }}>

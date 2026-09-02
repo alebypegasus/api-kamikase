@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  Users, Package, ShoppingBag, LogOut, ShieldAlert, Download, Building, 
+  Users, Package, ShoppingBag, LogOut, Download, Building, 
   Edit2, CheckCircle, X, Plus, TrendingUp, Key, Search, RefreshCw,
   Eye, FileText, CreditCard, Sparkles, ArrowRight, Activity, Clock,
   UserCheck, UserPlus, DollarSign
@@ -512,58 +512,77 @@ export default function AdminDashboard() {
   return (
     <div className="admin-container page-transition">
       {/* Top Navbar */}
-      <header className="admin-header">
-        <div className="admin-header-left">
-          <div className="admin-logo-box">
-            <ShieldAlert size={24} color="white" />
+      <header className="app-topbar admin-topbar">
+        <div className="topbar-brand-group">
+          <div className="topbar-logo-icon admin">
+            <Building size={22} />
           </div>
           <div>
-            <h1 className="admin-title neon-text-warm">Kamikase SUPER ADMIN</h1>
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>GESTÃO CENTRALIZADA & AUDITORIA</span>
+            <div className="topbar-brand-title">
+              Kamikase <span>ADMIN</span>
+            </div>
+            <div className="topbar-brand-subtitle admin-badge">
+              Diretoria Executiva & Auditoria
+            </div>
           </div>
         </div>
 
-        <div className="admin-header-right">
-          <ThemeToggle />
-
+        {/* Action Group */}
+        <div className="topbar-actions-group">
           <button 
             onClick={handleRefresh} 
-            className="btn-icon-admin hover-lift" 
-            title="Atualizar dados"
-            style={{ color: 'var(--primary-hover)', display: 'flex', alignItems: 'center', gap: '6px' }}
+            className="topbar-action-btn hover-lift" 
+            title="Atualizar dados do servidor"
           >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            <span>Atualizar</span>
           </button>
 
-          <div className="admin-user-info">
-            <div className="admin-user-details">
-              <div className="admin-user-name">{userName}</div>
-              <div className="admin-user-role">Super Administrador</div>
+          <div className="topbar-divider" />
+
+          <ThemeToggle />
+
+          <div className="topbar-divider" />
+
+          <div className="topbar-user-capsule">
+            <div className="topbar-user-avatar admin">
+              👑
             </div>
-            <button onClick={handleLogout} className="btn-icon-admin hover-lift" title="Sair" style={{ color: '#ef4444' }}>
-              <LogOut size={20} />
+            <div className="topbar-user-meta">
+              <span className="topbar-user-name">{userName}</span>
+              <span className="topbar-user-role admin">Super Admin</span>
+            </div>
+            <button 
+              onClick={handleLogout} 
+              className="topbar-logout-btn" 
+              title="Encerrar Sessão"
+            >
+              <LogOut size={15} />
+              <span>Sair</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="admin-tabs">
-        <button className={`admin-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-          <TrendingUp size={16} /> Visão Executiva
-        </button>
-        <button className={`admin-tab ${activeTab === 'sellers' ? 'active' : ''}`} onClick={() => setActiveTab('sellers')}>
-          <Users size={16} /> Lojistas ({globalTotalUsers})
-        </button>
-        <button className={`admin-tab ${activeTab === 'units' ? 'active' : ''}`} onClick={() => setActiveTab('units')}>
-          <Building size={16} /> Filiais ({globalTotalUnidades})
-        </button>
-        <button className={`admin-tab ${activeTab === 'sales' ? 'active' : ''}`} onClick={() => setActiveTab('sales')}>
-          <CreditCard size={16} /> Auditoria de Vendas ({todasVendas.length})
-        </button>
-        <button className={`admin-tab ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
-          <Package size={16} /> Inventário Global ({todosProdutos.length})
-        </button>
+      {/* Admin Navigation Tabs Container */}
+      <div className="admin-tabs-container">
+        <div className="admin-tabs">
+          <button className={`admin-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+            <TrendingUp size={16} /> <span>Visão Executiva</span>
+          </button>
+          <button className={`admin-tab ${activeTab === 'sellers' ? 'active' : ''}`} onClick={() => setActiveTab('sellers')}>
+            <Users size={16} /> <span>Lojistas ({globalTotalUsers})</span>
+          </button>
+          <button className={`admin-tab ${activeTab === 'units' ? 'active' : ''}`} onClick={() => setActiveTab('units')}>
+            <Building size={16} /> <span>Filiais ({globalTotalUnidades})</span>
+          </button>
+          <button className={`admin-tab ${activeTab === 'sales' ? 'active' : ''}`} onClick={() => setActiveTab('sales')}>
+            <CreditCard size={16} /> <span>Auditoria de Vendas ({todasVendas.length})</span>
+          </button>
+          <button className={`admin-tab ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
+            <Package size={16} /> <span>Inventário Global ({todosProdutos.length})</span>
+          </button>
+        </div>
       </div>
 
       <div className="admin-main">

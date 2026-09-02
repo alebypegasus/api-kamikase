@@ -16,6 +16,8 @@ const criarVendaSchema = z.object({
     desconto: z.coerce.number().min(0).optional().default(0),
     forma_pagamento: z.string().max(50).optional().default('Dinheiro'),
     parcelas: z.coerce.number().int().min(1).max(12).optional().default(1),
+    cliente_id: z.coerce.number().int().positive().nullable().optional(),
+    cliente_nome: z.string().max(255).nullable().optional(),
 });
 
 export class VendaController {
@@ -30,6 +32,8 @@ export class VendaController {
 
         const venda: IVenda = {
             usuarios_id: usuariosId,
+            cliente_id: dados.cliente_id || null,
+            cliente_nome: dados.cliente_nome ? dados.cliente_nome.trim() : null,
             valor_total: dados.valor_total,
             desconto: dados.desconto,
             forma_pagamento: dados.forma_pagamento,

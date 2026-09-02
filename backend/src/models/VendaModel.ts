@@ -10,8 +10,15 @@ export class VendaModel {
         try {
             // Insere a venda inicialmente com valor_total = 0
             const [resultado] = await connection.execute<ResultSetHeader>(
-                'INSERT INTO vendas (usuarios_id, valor_total, desconto, forma_pagamento, parcelas) VALUES (?, 0, ?, ?, ?)',
-                [venda.usuarios_id, venda.desconto || 0, venda.forma_pagamento || 'Dinheiro', venda.parcelas || 1]
+                'INSERT INTO vendas (usuarios_id, cliente_id, cliente_nome, valor_total, desconto, forma_pagamento, parcelas) VALUES (?, ?, ?, 0, ?, ?, ?)',
+                [
+                    venda.usuarios_id,
+                    venda.cliente_id || null,
+                    venda.cliente_nome || null,
+                    venda.desconto || 0,
+                    venda.forma_pagamento || 'Dinheiro',
+                    venda.parcelas || 1
+                ]
             );
             
             const vendaId = resultado.insertId;
@@ -63,6 +70,18 @@ export class VendaModel {
                 [valor_final, vendaId]
             );
 
+            // Criar automaticamente registro no Pós-Venda para acompanhamento / follow-up
+            await connection.execute(
+                `INSERT INTO pos_venda (vendas_id, usuarios_id, cliente_id, status, observacoes) 
+                 VALUES (?, ?, ?, 'Pendente', ?)`,
+                [
+                    vendaId,
+                    venda.usuarios_id,
+                    venda.cliente_id || null,
+                    venda.cliente_nome ? `Venda realizada para ${venda.cliente_nome}` : 'Venda realizada no PDV'
+                ]
+            );
+
             await connection.commit();
             connection.release();
             return vendaId;
@@ -75,7 +94,15 @@ export class VendaModel {
 
     static async listarPorUsuario(usuariosId: number): Promise<IVenda[]> {
         const [linhas] = await db.execute<RowDataPacket[]>(
-            'SELECT * FROM vendas WHERE usuarios_id = ? ORDER BY created_at DESC',
+            `SELECT v.*, 
+                    COALESCE(v.cliente_nome, c.nome) as cliente_identificado,
+                    c.nome as cliente_cadastrado_nome,
+                    c.telefone as cliente_telefone,
+                    c.cpf_cnpj as cliente_cpf
+             FROM vendas v 
+             LEFT JOIN clientes c ON v.cliente_id = c.id 
+             WHERE v.usuarios_id = ? 
+             ORDER BY v.created_at DESC`,
             [usuariosId]
         );
         return linhas as IVenda[];
@@ -83,7 +110,16 @@ export class VendaModel {
 
     static async listarDetalhesVenda(id: number, usuariosId: number): Promise<IVenda | null> {
         const [linhas] = await db.execute<RowDataPacket[]>(
-            'SELECT * FROM vendas WHERE id = ? AND usuarios_id = ?',
+            `SELECT v.*, 
+                    COALESCE(v.cliente_nome, c.nome) as cliente_identificado,
+                    c.nome as cliente_cadastrado_nome,
+                    c.telefone as cliente_telefone,
+                    c.cpf_cnpj as cliente_cpf,
+                    c.email as cliente_email,
+                    c.endereco as cliente_endereco
+             FROM vendas v 
+             LEFT JOIN clientes c ON v.cliente_id = c.id 
+             WHERE v.id = ? AND v.usuarios_id = ?`,
             [id, usuariosId]
         );
 

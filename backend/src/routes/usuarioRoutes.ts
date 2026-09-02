@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { UsuarioController } from '../controllers/UsuarioController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 
+import { adminMiddleware } from '../middlewares/adminMiddleware';
+
 const UserRouter = Router();
 
-// Public routes
-UserRouter.post('/cadastrar', UsuarioController.cadastrar);
+// Public route: Login only
 UserRouter.post('/login', UsuarioController.login);
+
+// Protected routes (Admin only for registration)
+UserRouter.post('/cadastrar', authMiddleware, adminMiddleware, UsuarioController.cadastrar);
 
 // Protected routes
 UserRouter.get('/', authMiddleware, UsuarioController.listarTodos);
